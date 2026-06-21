@@ -258,6 +258,28 @@ input, select, textarea {
   resize: vertical;
 }
 
+.field-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .field-row { grid-template-columns: 1fr; }
+}
+
+.proj-code {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+
 .form-actions { display: flex; gap: 10px; margin-top: 4px; }
 
 .btn {
@@ -396,6 +418,98 @@ input, select, textarea {
   opacity: 1;
   transform: translateX(-50%) translateY(0) rotate(-3deg);
 }
+
+/* ==========================================================
+   Weekly grid (user view)
+   ========================================================== */
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.week-nav .btn { padding: 6px 11px; }
+.week-label {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  min-width: 165px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.grid-table th, .grid-table td { text-align: center; }
+.grid-table th:first-child, .grid-table td:first-child { text-align: left; }
+.grid-table th .day-date {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.grid-table td.weekend, .grid-table th.weekend { background: #E5E7DF; }
+.grid-table td.weekend input {
+  background: #ECEEE6;
+  border-color: #D2D6C9;
+  color: var(--ink-soft);
+}
+
+.grid-table input[type="number"] {
+  width: 54px;
+  padding: 5px 4px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  background: #fff;
+  color: var(--ink);
+}
+.grid-table input[type="number"]:hover { border-color: var(--accent); }
+
+.grid-table .row-total {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+.grid-table tfoot .totals-row td {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  border-top: 2px solid var(--ink);
+  border-bottom: none;
+  padding-top: 10px;
+}
+
+.grid-hint {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  margin: 12px 2px 0;
+}
+
+/* ==========================================================
+   Access panel (editor — who can log to a project)
+   ========================================================== */
+.access-intro {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+}
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+}
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.86rem;
+  padding: 5px 2px;
+}
+.checkbox-row input { accent-color: var(--accent); }
 
 @media (max-width: 480px) {
   .auth-card { padding: 30px 22px 26px; }

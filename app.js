@@ -78,7 +78,15 @@ function toISODate(d) {
 function weekRangeLabel(start) {
   const end = addDays(start, 6);
   const fmt = (d) => `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
-  return `${fmt(start)} – ${fmt(end)}`;
+  return `Week ${isoWeekNumber(start)} · ${fmt(start)} – ${fmt(end)}`;
+}
+
+function isoWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
 function escapeHtml(str) {
@@ -228,6 +236,14 @@ function isProjectVisibleToCurrentUser(p) {
   return !p.assignedUserIds || p.assignedUserIds.length === 0 || p.assignedUserIds.includes(currentUser.uid);
 }
 
+function projectLabelHtml(p) {
+  return (p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : '') + escapeHtml(p.name);
+}
+
+function projectLabelText(p) {
+  return (p.code ? `${p.code} — ` : '') + p.name;
+}
+
 function listenAllUsers() {
   allUsersUnsub = db.collection('users').orderBy('name').onSnapshot((snap) => {
     allUsersCache = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.role !== 'editor');
@@ -239,14 +255,14 @@ function renderFilterProjectSelect() {
   const sel = $('filterProject');
   const current = sel.value;
   sel.innerHTML = '<option value="">All projects</option>' +
-    projectsCache.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    projectsCache.map(p => `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('');
   sel.value = current;
 }
 
 function renderProjectsTable() {
   const tbody = $('projectsTable').querySelector('tbody');
   if (!projectsCache.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No projects yet — create the first one above.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No projects yet — create the first one above.</td></tr>`;
     return;
   }
   tbody.innerHTML = projectsCache.map(p => {
@@ -254,7 +270,8 @@ function renderProjectsTable() {
     return `
     <tr>
       <td>${escapeHtml(p.name)}</td>
-      <td>${escapeHtml(p.description || '')}</td>
+      <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
+      <td>${escapeHtml(p.client || '')}</td>
       <td><span class="stamp-badge ${p.active === false ? 'stamp-badge-off' : ''}">${p.active === false ? 'Archived' : 'Active'}</span></td>
       <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
       <td class="row-actions">
@@ -271,6 +288,8 @@ $('newProjectBtn').addEventListener('click', () => {
   editingProjectId = null;
   $('projectId').value = '';
   $('projectName').value = '';
+  $('projectCode').value = '';
+  $('projectClient').value = '';
   $('projectDesc').value = '';
   $('accessPanel').classList.add('hidden');
   $('projectForm').classList.remove('hidden');
@@ -284,14 +303,17 @@ $('cancelProjectBtn').addEventListener('click', () => {
 $('projectForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('projectName').value.trim();
+  const code = $('projectCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  const client = $('projectClient').value.trim();
   const description = $('projectDesc').value.trim();
   if (!name) return;
+  $('projectCode').value = code;
 
   if (editingProjectId) {
-    await db.collection('projects').doc(editingProjectId).update({ name, description });
+    await db.collection('projects').doc(editingProjectId).update({ name, code, client, description });
   } else {
     await db.collection('projects').add({
-      name, description, active: true, assignedUserIds: [],
+      name, code, client, description, active: true, assignedUserIds: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: currentUser.uid
     });
@@ -310,6 +332,8 @@ $('projectsTable').addEventListener('click', async (e) => {
     editingProjectId = editId;
     $('projectId').value = editId;
     $('projectName').value = p.name;
+    $('projectCode').value = p.code || '';
+    $('projectClient').value = p.client || '';
     $('projectDesc').value = p.description || '';
     $('accessPanel').classList.add('hidden');
     $('projectForm').classList.remove('hidden');
@@ -394,7 +418,7 @@ function renderWeekGrid() {
       return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
         data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
     }).join('');
-    return `<tr><td>${escapeHtml(p.name)}</td>${cells}<td class="num row-total">${trimZeros(rowTotal)}</td></tr>`;
+    return `<tr><td>${projectLabelHtml(p)}</td>${cells}<td class="num row-total">${trimZeros(rowTotal)}</td></tr>`;
   }).join('');
 
   const dayTotals = dateStrs.map(ds =>
@@ -480,6 +504,10 @@ function renderFilterUserSelect() {
   $(id).addEventListener('change', renderAllEntries);
 });
 
+function projectById(id) {
+  return projectsCache.find(p => p.id === id);
+}
+
 function renderAllEntries() {
   const proj = $('filterProject').value;
   const user = $('filterUser').value;
@@ -496,25 +524,35 @@ function renderAllEntries() {
 
   const tbody = $('allEntriesTable').querySelector('tbody');
   $('allEmptyState').classList.toggle('hidden', filteredRows.length > 0);
-  tbody.innerHTML = filteredRows.map(en => `
+  tbody.innerHTML = filteredRows.map(en => {
+    const p = projectById(en.projectId);
+    const codeBadge = p && p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : '';
+    return `
     <tr>
       <td>${formatDate(en.date)}</td>
       <td>${escapeHtml(en.userName)}</td>
-      <td>${escapeHtml(en.projectName)}</td>
+      <td>${codeBadge}${escapeHtml(en.projectName)}</td>
+      <td>${escapeHtml(p ? (p.client || '') : '')}</td>
       <td class="num">${en.hours}</td>
       <td class="note-cell">${escapeHtml(en.note || '')}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   const total = filteredRows.reduce((s, en) => s + en.hours, 0);
   $('allEntriesTotal').textContent = trimZeros(total);
 }
 
 $('exportCsvBtn').addEventListener('click', () => {
-  const header = ['Date', 'Person', 'Project', 'Hours', 'Note'];
-  const lines = [header.join(',')].concat(filteredRows.map(en => [
-    en.date, csvSafe(en.userName), csvSafe(en.projectName), en.hours, csvSafe(en.note || '')
-  ].join(',')));
+  const header = ['Date', 'Person', 'Project', 'Project number', 'Client', 'Hours', 'Note'];
+  const lines = [header.join(',')].concat(filteredRows.map(en => {
+    const p = projectById(en.projectId);
+    return [
+      en.date, csvSafe(en.userName), csvSafe(en.projectName),
+      csvSafe(p ? (p.code || '') : ''), csvSafe(p ? (p.client || '') : ''),
+      en.hours, csvSafe(en.note || '')
+    ].join(',');
+  }));
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

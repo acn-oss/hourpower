@@ -102,6 +102,14 @@
           <label>Project name
             <input type="text" id="projectName" required />
           </label>
+          <div class="field-row">
+            <label>Project number <span class="optional">optional, e.g. AB12</span>
+              <input type="text" id="projectCode" maxlength="4" placeholder="AB12" />
+            </label>
+            <label>Client <span class="optional">optional</span>
+              <input type="text" id="projectClient" placeholder="Client name" />
+            </label>
+          </div>
           <label>Description <span class="optional">optional</span>
             <input type="text" id="projectDesc" />
           </label>
@@ -122,7 +130,7 @@
 
         <div class="table-wrap">
           <table class="ledger-table" id="projectsTable">
-            <thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Visible to</th><th></th></tr></thead>
+            <thead><tr><th>Project</th><th>No.</th><th>Client</th><th>Status</th><th>Visible to</th><th></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -152,7 +160,7 @@
 
         <div class="table-wrap">
           <table class="ledger-table" id="allEntriesTable">
-            <thead><tr><th>Date</th><th>Person</th><th>Project</th><th class="num">Hours</th><th>Note</th></tr></thead>
+            <thead><tr><th>Date</th><th>Person</th><th>Project</th><th>Client</th><th class="num">Hours</th><th>Note</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
