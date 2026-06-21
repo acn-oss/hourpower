@@ -529,6 +529,18 @@ input, select, textarea {
 }
 .rate-input:hover { border-color: var(--accent); }
 
+.rate-lines-section { margin-top: 4px; }
+.rate-lines-table input[type="date"] {
+  padding: 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.83rem;
+  background: #fff;
+  color: var(--ink);
+  width: 142px;
+}
+.rate-lines-table td { padding: 6px 10px; }
+
 @media (max-width: 480px) {
   .auth-card { padding: 30px 22px 26px; }
   .topbar { padding: 12px 16px; }

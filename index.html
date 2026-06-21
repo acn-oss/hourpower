@@ -113,6 +113,23 @@
           <label>Description <span class="optional">optional</span>
             <input type="text" id="projectDesc" />
           </label>
+
+          <div class="rate-lines-section">
+            <p class="access-intro">Project-specific rates <span class="optional">optional — overrides the employee's standard rate from each "used from" date onward, including hours already logged. Leave a row blank to skip it.</span></p>
+            <div class="table-wrap">
+              <table class="ledger-table rate-lines-table">
+                <thead><tr><th>Used from</th><th class="num">Sales rate (DKK/h)</th><th class="num">Cost rate (DKK/h)</th></tr></thead>
+                <tbody>
+                  <tr><td><input type="date" id="rateLineDate0" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineSales0" class="rate-input" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineCost0" class="rate-input" /></td></tr>
+                  <tr><td><input type="date" id="rateLineDate1" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineSales1" class="rate-input" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineCost1" class="rate-input" /></td></tr>
+                  <tr><td><input type="date" id="rateLineDate2" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineSales2" class="rate-input" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineCost2" class="rate-input" /></td></tr>
+                  <tr><td><input type="date" id="rateLineDate3" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineSales3" class="rate-input" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineCost3" class="rate-input" /></td></tr>
+                  <tr><td><input type="date" id="rateLineDate4" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineSales4" class="rate-input" /></td><td class="num"><input type="number" min="0" step="1" id="rateLineCost4" class="rate-input" /></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Save project</button>
             <button type="button" id="cancelProjectBtn" class="btn btn-ghost">Cancel</button>

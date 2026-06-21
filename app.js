@@ -310,6 +310,22 @@ function formatDkk(n) {
   return n.toLocaleString('da-DK', { maximumFractionDigits: 0 }) + ' kr.';
 }
 
+function resolveProjectRate(project, dateStr, uid) {
+  const standard = ratesCache[uid] || {};
+  const lines = (project && project.rateLines) || [];
+
+  let applicable = null;
+  for (const line of lines) {
+    if (line.usedFrom <= dateStr && (!applicable || line.usedFrom > applicable.usedFrom)) {
+      applicable = line;
+    }
+  }
+
+  const salesRate = (applicable && applicable.salesRate != null) ? applicable.salesRate : (standard.salesRate || 0);
+  const costRate = (applicable && applicable.costRate != null) ? applicable.costRate : (standard.costRate || 0);
+  return { salesRate, costRate };
+}
+
 function renderProjectTotals() {
   const projectId = $('totalsProjectSelect').value;
   const tbody = $('projectTotalsTable').querySelector('tbody');
@@ -325,10 +341,14 @@ function renderProjectTotals() {
   }
   $('totalsHint').classList.add('hidden');
 
+  const project = projectById(projectId);
   const byUser = {};
   allEntriesCache.filter(en => en.projectId === projectId).forEach(en => {
-    if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, hours: 0 };
+    if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, hours: 0, cost: 0, sales: 0 };
+    const { salesRate, costRate } = resolveProjectRate(project, en.date, en.userId);
     byUser[en.userId].hours += en.hours;
+    byUser[en.userId].cost += en.hours * costRate;
+    byUser[en.userId].sales += en.hours * salesRate;
   });
 
   const userIds = Object.keys(byUser).sort((a, b) => byUser[a].userName.localeCompare(byUser[b].userName));
@@ -337,10 +357,7 @@ function renderProjectTotals() {
 
   let totalHours = 0, totalCost = 0, totalSales = 0;
   tbody.innerHTML = userIds.map(uid => {
-    const { userName, hours } = byUser[uid];
-    const rate = ratesCache[uid] || {};
-    const cost = hours * (rate.costRate || 0);
-    const sales = hours * (rate.salesRate || 0);
+    const { userName, hours, cost, sales } = byUser[uid];
     totalHours += hours; totalCost += cost; totalSales += sales;
     return `
     <tr>
@@ -408,10 +425,45 @@ $('newProjectBtn').addEventListener('click', () => {
   $('projectCode').value = '';
   $('projectClient').value = '';
   $('projectDesc').value = '';
+  clearRateLineInputs();
   $('accessPanel').classList.add('hidden');
   $('projectForm').classList.remove('hidden');
   $('projectName').focus();
 });
+
+const RATE_LINE_COUNT = 5;
+
+function clearRateLineInputs() {
+  for (let i = 0; i < RATE_LINE_COUNT; i++) {
+    $(`rateLineDate${i}`).value = '';
+    $(`rateLineSales${i}`).value = '';
+    $(`rateLineCost${i}`).value = '';
+  }
+}
+
+function fillRateLineInputs(rateLines) {
+  clearRateLineInputs();
+  (rateLines || []).slice(0, RATE_LINE_COUNT).forEach((line, i) => {
+    $(`rateLineDate${i}`).value = line.usedFrom || '';
+    $(`rateLineSales${i}`).value = line.salesRate != null ? line.salesRate : '';
+    $(`rateLineCost${i}`).value = line.costRate != null ? line.costRate : '';
+  });
+}
+
+function readRateLineInputs() {
+  const lines = [];
+  for (let i = 0; i < RATE_LINE_COUNT; i++) {
+    const usedFrom = $(`rateLineDate${i}`).value;
+    if (!usedFrom) continue;
+    const salesRaw = $(`rateLineSales${i}`).value.trim();
+    const costRaw = $(`rateLineCost${i}`).value.trim();
+    const salesRate = (salesRaw !== '' && !isNaN(parseFloat(salesRaw)) && parseFloat(salesRaw) >= 0) ? parseFloat(salesRaw) : null;
+    const costRate = (costRaw !== '' && !isNaN(parseFloat(costRaw)) && parseFloat(costRaw) >= 0) ? parseFloat(costRaw) : null;
+    lines.push({ usedFrom, salesRate, costRate });
+  }
+  lines.sort((a, b) => a.usedFrom.localeCompare(b.usedFrom));
+  return lines;
+}
 
 $('cancelProjectBtn').addEventListener('click', () => {
   $('projectForm').classList.add('hidden');
@@ -423,14 +475,15 @@ $('projectForm').addEventListener('submit', async (e) => {
   const code = $('projectCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
   const client = $('projectClient').value.trim();
   const description = $('projectDesc').value.trim();
+  const rateLines = readRateLineInputs();
   if (!name) return;
   $('projectCode').value = code;
 
   if (editingProjectId) {
-    await db.collection('projects').doc(editingProjectId).update({ name, code, client, description });
+    await db.collection('projects').doc(editingProjectId).update({ name, code, client, description, rateLines });
   } else {
     await db.collection('projects').add({
-      name, code, client, description, active: true, assignedUserIds: [],
+      name, code, client, description, rateLines, active: true, assignedUserIds: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: currentUser.uid
     });
@@ -452,6 +505,7 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectCode').value = p.code || '';
     $('projectClient').value = p.client || '';
     $('projectDesc').value = p.description || '';
+    fillRateLineInputs(p.rateLines);
     $('accessPanel').classList.add('hidden');
     $('projectForm').classList.remove('hidden');
   }
