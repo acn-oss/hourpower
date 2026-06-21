@@ -571,6 +571,42 @@ input, select, textarea {
   color: var(--accent-dark);
 }
 
+/* ==========================================================
+   Wish list link
+   ========================================================== */
+.wish-list-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -4px;
+}
+
+/* ==========================================================
+   Collapsible card (All entries)
+   ========================================================== */
+button.card-header-row.card-toggle {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+button.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
+button.card-header-row.card-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.chevron {
+  display: inline-block;
+  font-size: 0.75em;
+  color: var(--ink-soft);
+  margin-left: 6px;
+  transition: transform 0.15s ease;
+}
+.chevron.collapsed { transform: rotate(-90deg); }
+
 @media (max-width: 480px) {
   .auth-card { padding: 30px 22px 26px; }
   .topbar { padding: 12px 16px; }

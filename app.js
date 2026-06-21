@@ -80,7 +80,7 @@ function toISODate(d) {
 function weekRangeLabel(start) {
   const end = addDays(start, 6);
   const fmt = (d) => `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
-  return `Week ${isoWeekNumber(start)} · ${fmt(start)} – ${fmt(end)}`;
+  return `${fmt(start)} – ${fmt(end)}`;
 }
 
 function isoWeekNumber(date) {
@@ -609,6 +609,7 @@ function listenUserEntries() {
 function renderWeekGrid() {
   if (!currentUser || currentUser.role !== 'user') return;
 
+  $('hoursHeading').textContent = `Hours week ${isoWeekNumber(weekStart)}`;
   $('weekLabel').textContent = weekRangeLabel(weekStart);
 
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -719,6 +720,13 @@ function renderFilterUserSelect() {
 
 ['filterProject', 'filterUser', 'filterFrom', 'filterTo'].forEach(id => {
   $(id).addEventListener('change', renderAllEntries);
+});
+
+$('allEntriesToggle').addEventListener('click', () => {
+  const expanded = $('allEntriesToggle').getAttribute('aria-expanded') === 'true';
+  $('allEntriesToggle').setAttribute('aria-expanded', String(!expanded));
+  $('allEntriesBody').classList.toggle('hidden', expanded);
+  $('allEntriesChevron').classList.toggle('collapsed', expanded);
 });
 
 function projectById(id) {

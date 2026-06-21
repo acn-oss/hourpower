@@ -67,7 +67,7 @@
     <section id="userView" class="view hidden">
       <div class="card">
         <div class="card-header-row">
-          <h2>Hours this week</h2>
+          <h2 id="hoursHeading">Hours this week</h2>
           <div class="week-nav">
             <button id="weekPrevBtn" class="btn btn-ghost" type="button" aria-label="Previous week">‹</button>
             <span id="weekLabel" class="week-label"></span>
@@ -90,6 +90,11 @@
 
     <!-- EDITOR VIEW -->
     <section id="editorView" class="view hidden">
+
+      <div class="wish-list-row">
+        <a href="https://docs.google.com/spreadsheets/d/1nR_B6JsfZ6MIl-L7hv2g91BCxsyiIwEsxjM6EhoGL6s/edit?gid=0#gid=0"
+           target="_blank" rel="noopener noreferrer" class="btn btn-ghost">Wish list ↗</a>
+      </div>
 
       <div class="card">
         <div class="card-header-row">
@@ -163,50 +168,6 @@
 
       <div class="card">
         <div class="card-header-row">
-          <h2>Employee rates</h2>
-        </div>
-        <p class="access-intro">Sales rate and cost rate are only visible to you here — employees never see these numbers, even their own.</p>
-        <div class="table-wrap">
-          <table class="ledger-table" id="ratesTable">
-            <thead><tr><th>Employee</th><th class="num">Sales rate (DKK/h)</th><th class="num">Cost rate (DKK/h)</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header-row">
-          <h2>All entries</h2>
-          <span class="total-pill">Total: <strong id="allEntriesTotal">0</strong>h</span>
-        </div>
-
-        <div class="filters">
-          <label>Project
-            <select id="filterProject"><option value="">All projects</option></select>
-          </label>
-          <label>Person
-            <select id="filterUser"><option value="">Everyone</option></select>
-          </label>
-          <label>From
-            <input type="date" id="filterFrom" />
-          </label>
-          <label>To
-            <input type="date" id="filterTo" />
-          </label>
-          <button id="exportCsvBtn" class="btn btn-ghost" type="button">Export CSV</button>
-        </div>
-
-        <div class="table-wrap">
-          <table class="ledger-table" id="allEntriesTable">
-            <thead><tr><th>Date</th><th>Person</th><th>Project</th><th>Client</th><th class="num">Hours</th><th>Note</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <p id="allEmptyState" class="empty-state hidden">No entries match these filters.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-header-row">
           <h2>Project totals</h2>
         </div>
         <div class="filters">
@@ -232,6 +193,52 @@
             <tbody></tbody>
             <tfoot></tfoot>
           </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Employee standard rates</h2>
+        </div>
+        <p class="access-intro">Sales rate and cost rate are only visible to you here — employees never see these numbers, even their own.</p>
+        <div class="table-wrap">
+          <table class="ledger-table" id="ratesTable">
+            <thead><tr><th>Employee</th><th class="num">Sales rate (DKK/h)</th><th class="num">Cost rate (DKK/h)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <button type="button" class="card-header-row card-toggle" id="allEntriesToggle" aria-expanded="false">
+          <h2>All entries <span class="chevron collapsed" id="allEntriesChevron">▾</span></h2>
+          <span class="total-pill">Total: <strong id="allEntriesTotal">0</strong>h</span>
+        </button>
+
+        <div id="allEntriesBody" class="collapsible-body hidden">
+          <div class="filters">
+            <label>Project
+              <select id="filterProject"><option value="">All projects</option></select>
+            </label>
+            <label>Person
+              <select id="filterUser"><option value="">Everyone</option></select>
+            </label>
+            <label>From
+              <input type="date" id="filterFrom" />
+            </label>
+            <label>To
+              <input type="date" id="filterTo" />
+            </label>
+            <button id="exportCsvBtn" class="btn btn-ghost" type="button">Export CSV</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="ledger-table" id="allEntriesTable">
+              <thead><tr><th>Date</th><th>Person</th><th>Project</th><th>Client</th><th class="num">Hours</th><th>Note</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="allEmptyState" class="empty-state hidden">No entries match these filters.</p>
         </div>
       </div>
 
