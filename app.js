@@ -225,8 +225,9 @@ function cleanupListeners() {
 // Projects
 // ============================================================
 function listenProjects() {
-  db.collection('projects').orderBy('name').onSnapshot((snap) => {
+  db.collection('projects').onSnapshot((snap) => {
     projectsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    projectsCache.sort(compareProjectsByCodeDesc);
     if (currentUser.role === 'editor') {
       renderProjectsTable();
       renderFilterProjectSelect();
@@ -234,6 +235,33 @@ function listenProjects() {
       renderWeekGrid();
     }
   });
+}
+
+// Highest project number first (e.g. P301 above P299). Falls back to name
+// when codes match or are missing, so uncoded projects still sort sensibly.
+function compareProjectsByCodeDesc(a, b) {
+  const codeCompare = naturalCompare(b.code || '', a.code || '');
+  if (codeCompare !== 0) return codeCompare;
+  return (a.name || '').localeCompare(b.name || '');
+}
+
+// Compares strings the way a person would: "P2" < "P12" < "P301", not lexicographically.
+function naturalCompare(a, b) {
+  const aParts = a.match(/(\d+|\D+)/g) || [];
+  const bParts = b.match(/(\d+|\D+)/g) || [];
+  const len = Math.max(aParts.length, bParts.length);
+  for (let i = 0; i < len; i++) {
+    const ap = aParts[i] || '';
+    const bp = bParts[i] || '';
+    if (/^\d+$/.test(ap) && /^\d+$/.test(bp)) {
+      const diff = parseInt(ap, 10) - parseInt(bp, 10);
+      if (diff !== 0) return diff;
+    } else {
+      const cmp = ap.localeCompare(bp);
+      if (cmp !== 0) return cmp;
+    }
+  }
+  return 0;
 }
 
 function isProjectVisibleToCurrentUser(p) {
@@ -435,8 +463,8 @@ function renderProjectsTable() {
     const n = (p.assignedUserIds || []).length;
     return `
     <tr>
-      <td>${escapeHtml(p.name)}</td>
       <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
+      <td>${escapeHtml(p.name)}</td>
       <td>${escapeHtml(p.client || '')}</td>
       <td><span class="stamp-badge ${p.active === false ? 'stamp-badge-off' : ''}">${p.active === false ? 'Archived' : 'Active'}</span></td>
       <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
