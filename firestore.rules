@@ -19,7 +19,7 @@ service cloud.firestore {
     function isEditor() {
       return isSignedIn() &&
         request.auth.token.email in [
-          'you@example.com'
+          'info@urbanpower.dk'
         ];
     }
 
