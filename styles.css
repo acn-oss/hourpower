@@ -1,0 +1,403 @@
+/* ==========================================================
+   Tokens
+   ========================================================== */
+:root {
+  --paper: #EDEFEA;
+  --paper-card: #F8F9F6;
+  --ink: #1C2A2E;
+  --ink-soft: #5C6B6A;
+  --line: #C9CFC6;
+  --line-soft: #DEE2DA;
+  --accent: #2F5D5A;
+  --accent-dark: #234543;
+  --accent-soft: #DCE6E0;
+  --stamp: #B5712F;
+  --danger: #A33B2E;
+  --radius: 6px;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --shadow: 0 1px 2px rgba(28,42,46,0.06), 0 4px 14px rgba(28,42,46,0.07);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+h1, h2 { font-family: var(--font-display); font-weight: 600; margin: 0 0 4px; }
+h2 { font-size: 1.15rem; letter-spacing: 0.01em; }
+
+.hidden { display: none !important; }
+
+button { font-family: var(--font-body); cursor: pointer; }
+input, select, textarea {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* ==========================================================
+   Setup notice
+   ========================================================== */
+.setup-notice {
+  background: var(--stamp);
+  color: #fff;
+  text-align: center;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.setup-notice code {
+  background: rgba(255,255,255,0.2);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+/* ==========================================================
+   Auth screen — ledger paper backdrop
+   ========================================================== */
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+}
+
+.ledger-bg {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 31px,
+    var(--line-soft) 32px
+  );
+  opacity: 0.6;
+}
+
+.auth-card {
+  position: relative;
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 40px 36px 32px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.brand {
+  font-size: 2rem;
+  color: var(--accent-dark);
+}
+.brand-sub {
+  margin: 0 0 24px;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.auth-form input {
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+}
+
+.form-error {
+  background: #FBEAE6;
+  color: var(--danger);
+  border: 1px solid #E8BDB2;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  margin-bottom: 14px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.85rem;
+  margin-top: 16px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+}
+.link-danger { color: var(--danger); }
+
+/* ==========================================================
+   App shell
+   ========================================================== */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--ink);
+  color: #fff;
+  padding: 14px 24px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.brand-mark {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+}
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+.whoami { font-size: 0.85rem; color: #C9D6D2; }
+
+.main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.view { display: flex; flex-direction: column; gap: 24px; }
+
+.grid-two {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .grid-two { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================
+   Cards
+   ========================================================== */
+.card {
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px 22px;
+  box-shadow: var(--shadow);
+}
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.total-pill {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.total-pill strong { font-size: 0.95rem; }
+
+/* ==========================================================
+   Forms
+   ========================================================== */
+.stacked-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.stacked-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.optional { font-weight: 400; color: #93A09E; }
+
+.stacked-form input,
+.stacked-form select,
+.stacked-form textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.form-actions { display: flex; gap: 10px; margin-top: 4px; }
+
+.btn {
+  border: none;
+  border-radius: var(--radius);
+  padding: 9px 16px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-dark); }
+.btn-block { width: 100%; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.btn-ghost:hover { background: var(--accent-soft); color: var(--accent-dark); }
+
+/* ==========================================================
+   Ledger tables
+   ========================================================== */
+.table-wrap { overflow-x: auto; }
+
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.ledger-table thead th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--ink);
+  padding: 0 10px 8px;
+}
+.ledger-table tbody td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+.ledger-table tbody tr:last-child td {
+  border-bottom: 2px solid var(--ink);
+}
+.ledger-table .num {
+  font-family: var(--font-mono);
+  text-align: right;
+  white-space: nowrap;
+}
+.note-cell { color: var(--ink-soft); max-width: 280px; }
+.row-actions { white-space: nowrap; text-align: right; }
+.row-actions .link-btn { margin: 0 0 0 10px; font-size: 0.8rem; }
+
+.empty-state {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  padding: 18px 4px;
+  text-align: center;
+}
+
+/* status stamp badge used in projects table */
+.stamp-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--stamp);
+  border: 1.5px solid var(--stamp);
+  border-radius: 4px;
+  padding: 2px 7px;
+  transform: rotate(-2deg);
+}
+.stamp-badge-off {
+  color: var(--ink-soft);
+  border-color: var(--line);
+}
+
+/* ==========================================================
+   Filters (editor)
+   ========================================================== */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed var(--line);
+}
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+.filters select, .filters input {
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  font-size: 0.85rem;
+}
+.filters .btn { margin-left: auto; align-self: flex-end; }
+
+/* ==========================================================
+   Stamp toast — the signature confirmation moment
+   ========================================================== */
+.stamp {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px) rotate(-3deg);
+  background: #fff;
+  color: var(--stamp);
+  border: 2.5px solid var(--stamp);
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 100;
+  box-shadow: var(--shadow);
+}
+.stamp-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) rotate(-3deg);
+}
+
+@media (max-width: 480px) {
+  .auth-card { padding: 30px 22px 26px; }
+  .topbar { padding: 12px 16px; }
+}

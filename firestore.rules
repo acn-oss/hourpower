@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// ============================================================
+// Paste this into Firebase Console → Firestore Database → Rules,
+// then hit "Publish".
+//
+// Edit the email list below to match ADMIN_EMAILS in config.js.
+// This is the list that's actually enforced — config.js only
+// controls what the app displays.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEditor() {
+      return isSignedIn() &&
+        request.auth.token.email in [
+          'you@example.com'
+        ];
+    }
+
+    // Each user's own profile doc (name, email, role)
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // Projects: anyone signed in can see them, only editors can change them
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow write: if isEditor();
+    }
+
+    // Hour entries: a user can read/write their own; editors can read/write all
+    match /entries/{entryId} {
+      allow read: if isSignedIn() && (isEditor() || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isEditor());
+    }
+  }
+}

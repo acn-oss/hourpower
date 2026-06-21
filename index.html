@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TimeLedger — Hour Registration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div id="setupNotice" class="setup-notice hidden">
+  <strong>Setup needed.</strong> Open <code>config.js</code> and paste in your Firebase project keys — see README.md for the walkthrough.
+</div>
+
+<!-- AUTH SCREEN -->
+<section id="authScreen" class="auth-screen">
+  <div class="ledger-bg" aria-hidden="true"></div>
+  <div class="auth-card">
+    <h1 class="brand">TimeLedger</h1>
+    <p class="brand-sub">Hour registration, kept simple.</p>
+
+    <div id="authError" class="form-error hidden"></div>
+
+    <form id="loginForm" class="auth-form">
+      <label>Email
+        <input type="email" id="loginEmail" required autocomplete="email" />
+      </label>
+      <label>Password
+        <input type="password" id="loginPassword" required autocomplete="current-password" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+
+    <form id="signupForm" class="auth-form hidden">
+      <label>Your name
+        <input type="text" id="signupName" required autocomplete="name" />
+      </label>
+      <label>Email
+        <input type="email" id="signupEmail" required autocomplete="email" />
+      </label>
+      <label>Password <span class="optional">min. 6 characters</span>
+        <input type="password" id="signupPassword" required minlength="6" autocomplete="new-password" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Create account</button>
+    </form>
+
+    <button id="toggleAuthMode" class="link-btn" type="button">Need an account? Create one</button>
+  </div>
+</section>
+
+<!-- APP SCREEN -->
+<div id="appScreen" class="app-screen hidden">
+  <header class="topbar">
+    <span class="brand-mark">TimeLedger</span>
+    <div class="topbar-right">
+      <span id="whoami" class="whoami"></span>
+      <button id="logoutBtn" class="btn btn-ghost">Log out</button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- USER VIEW -->
+    <section id="userView" class="view hidden">
+      <div class="grid-two">
+        <div class="card">
+          <h2>Log hours</h2>
+          <form id="entryForm" class="stacked-form">
+            <input type="hidden" id="entryId" />
+            <label>Project
+              <select id="entryProject" required></select>
+            </label>
+            <label>Date
+              <input type="date" id="entryDate" required />
+            </label>
+            <label>Hours
+              <input type="number" id="entryHours" min="0.25" step="0.25" placeholder="e.g. 3.5" required />
+            </label>
+            <label>Note <span class="optional">optional</span>
+              <textarea id="entryNote" rows="2" placeholder="What did you work on?"></textarea>
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Log hours</button>
+              <button type="button" id="cancelEditBtn" class="btn btn-ghost hidden">Cancel edit</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header-row">
+            <h2>My hours</h2>
+            <span class="total-pill">This month: <strong id="userMonthTotal">0</strong>h</span>
+          </div>
+          <div class="table-wrap">
+            <table class="ledger-table" id="userEntriesTable">
+              <thead>
+                <tr><th>Date</th><th>Project</th><th class="num">Hours</th><th>Note</th><th></th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="userEmptyState" class="empty-state hidden">No hours logged yet — your first entry will show up here.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- EDITOR VIEW -->
+    <section id="editorView" class="view hidden">
+
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Projects</h2>
+          <button id="newProjectBtn" class="btn btn-primary" type="button">+ New project</button>
+        </div>
+
+        <form id="projectForm" class="stacked-form hidden">
+          <input type="hidden" id="projectId" />
+          <label>Project name
+            <input type="text" id="projectName" required />
+          </label>
+          <label>Description <span class="optional">optional</span>
+            <input type="text" id="projectDesc" />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save project</button>
+            <button type="button" id="cancelProjectBtn" class="btn btn-ghost">Cancel</button>
+          </div>
+        </form>
+
+        <div class="table-wrap">
+          <table class="ledger-table" id="projectsTable">
+            <thead><tr><th>Project</th><th>Description</th><th>Status</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row">
+          <h2>All entries</h2>
+          <span class="total-pill">Total: <strong id="allEntriesTotal">0</strong>h</span>
+        </div>
+
+        <div class="filters">
+          <label>Project
+            <select id="filterProject"><option value="">All projects</option></select>
+          </label>
+          <label>Person
+            <select id="filterUser"><option value="">Everyone</option></select>
+          </label>
+          <label>From
+            <input type="date" id="filterFrom" />
+          </label>
+          <label>To
+            <input type="date" id="filterTo" />
+          </label>
+          <button id="exportCsvBtn" class="btn btn-ghost" type="button">Export CSV</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="ledger-table" id="allEntriesTable">
+            <thead><tr><th>Date</th><th>Person</th><th>Project</th><th class="num">Hours</th><th>Note</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="allEmptyState" class="empty-state hidden">No entries match these filters.</p>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+
+<div id="stamp" class="stamp hidden">Logged</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
