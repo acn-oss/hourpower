@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TimeLedger — Hour Registration</title>
+<title>Hour Power — Hour Registration</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
 <section id="authScreen" class="auth-screen">
   <div class="ledger-bg" aria-hidden="true"></div>
   <div class="auth-card">
-    <h1 class="brand">TimeLedger</h1>
+    <h1 class="brand">Hour Power</h1>
     <p class="brand-sub">Hour registration, kept simple.</p>
 
     <div id="authError" class="form-error hidden"></div>
@@ -54,7 +54,7 @@
 <!-- APP SCREEN -->
 <div id="appScreen" class="app-screen hidden">
   <header class="topbar">
-    <span class="brand-mark">TimeLedger</span>
+    <span class="brand-mark">Hour Power</span>
     <div class="topbar-right">
       <span id="whoami" class="whoami"></span>
       <button id="logoutBtn" class="btn btn-ghost">Log out</button>
@@ -65,45 +65,26 @@
 
     <!-- USER VIEW -->
     <section id="userView" class="view hidden">
-      <div class="grid-two">
-        <div class="card">
-          <h2>Log hours</h2>
-          <form id="entryForm" class="stacked-form">
-            <input type="hidden" id="entryId" />
-            <label>Project
-              <select id="entryProject" required></select>
-            </label>
-            <label>Date
-              <input type="date" id="entryDate" required />
-            </label>
-            <label>Hours
-              <input type="number" id="entryHours" min="0.25" step="0.25" placeholder="e.g. 3.5" required />
-            </label>
-            <label>Note <span class="optional">optional</span>
-              <textarea id="entryNote" rows="2" placeholder="What did you work on?"></textarea>
-            </label>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Log hours</button>
-              <button type="button" id="cancelEditBtn" class="btn btn-ghost hidden">Cancel edit</button>
-            </div>
-          </form>
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Hours this week</h2>
+          <div class="week-nav">
+            <button id="weekPrevBtn" class="btn btn-ghost" type="button" aria-label="Previous week">‹</button>
+            <span id="weekLabel" class="week-label"></span>
+            <button id="weekNextBtn" class="btn btn-ghost" type="button" aria-label="Next week">›</button>
+            <button id="weekTodayBtn" class="btn btn-ghost" type="button">This week</button>
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-header-row">
-            <h2>My hours</h2>
-            <span class="total-pill">This month: <strong id="userMonthTotal">0</strong>h</span>
-          </div>
-          <div class="table-wrap">
-            <table class="ledger-table" id="userEntriesTable">
-              <thead>
-                <tr><th>Date</th><th>Project</th><th class="num">Hours</th><th>Note</th><th></th></tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <p id="userEmptyState" class="empty-state hidden">No hours logged yet — your first entry will show up here.</p>
+        <div class="table-wrap">
+          <table class="ledger-table grid-table" id="weekGridTable">
+            <thead><tr id="weekGridHeadRow"></tr></thead>
+            <tbody id="weekGridBody"></tbody>
+            <tfoot id="weekGridFoot"></tfoot>
+          </table>
         </div>
+        <p id="noProjectsState" class="empty-state hidden">You don't have any projects assigned yet — ask your editor to add you to one.</p>
+        <p class="grid-hint">Type hours into a cell and click elsewhere (or press Enter) to save it. Leave a cell empty to clear it.</p>
       </div>
     </section>
 
@@ -130,9 +111,18 @@
           </div>
         </form>
 
+        <div id="accessPanel" class="stacked-form hidden">
+          <p class="access-intro">Who can log hours to <strong id="accessProjectName"></strong>? Leave everyone unchecked to keep it open to your whole team.</p>
+          <div id="accessCheckboxes" class="checkbox-list"></div>
+          <div class="form-actions">
+            <button type="button" id="saveAccessBtn" class="btn btn-primary">Save access</button>
+            <button type="button" id="cancelAccessBtn" class="btn btn-ghost">Cancel</button>
+          </div>
+        </div>
+
         <div class="table-wrap">
           <table class="ledger-table" id="projectsTable">
-            <thead><tr><th>Project</th><th>Description</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Visible to</th><th></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>

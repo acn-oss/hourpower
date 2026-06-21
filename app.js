@@ -1,5 +1,5 @@
 // ============================================================
-// TimeLedger — app.js
+// Hour Power — app.js
 // You shouldn't need to edit this file. Project/account
 // settings live in config.js.
 // ============================================================
@@ -12,7 +12,7 @@ if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {
   setupNotice.classList.remove('hidden');
   document.querySelectorAll('#loginForm input, #loginForm button, #signupForm input, #signupForm button')
     .forEach(el => el.disabled = true);
-  throw new Error('TimeLedger: fill in config.js with your Firebase project keys before using the app.');
+  throw new Error('Hour Power: fill in config.js with your Firebase project keys before using the app.');
 }
 
 // ---- Firebase init -------------------------------------------------
@@ -21,13 +21,17 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 let currentUser = null;      // { uid, name, email, role }
-let projectsCache = [];      // [{id, name, description, active}]
+let projectsCache = [];      // [{id, name, description, active, assignedUserIds}]
+let userEntriesCache = [];   // current user's entries (all dates)
 let allEntriesCache = [];
+let allUsersCache = [];      // editor only: everyone except editors, for the access panel
 let filteredRows = [];
 let userEntriesUnsub = null;
 let allEntriesUnsub = null;
-let editingEntryId = null;
+let allUsersUnsub = null;
 let editingProjectId = null;
+let accessProjectId = null;
+let weekStart = getMonday(new Date());
 
 function isAdminEmail(email) {
   return ADMIN_EMAILS.map(e => e.toLowerCase()).includes((email || '').toLowerCase());
@@ -47,6 +51,34 @@ function showStamp(text) {
 function formatDate(d) {
   const [y, m, day] = d.split('-');
   return `${day}/${m}/${y}`;
+}
+
+function getMonday(d) {
+  const date = new Date(d);
+  const day = date.getDay(); // 0 = Sun ... 6 = Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function addDays(d, n) {
+  const date = new Date(d);
+  date.setDate(date.getDate() + n);
+  return date;
+}
+
+function toISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function weekRangeLabel(start) {
+  const end = addDays(start, 6);
+  const fmt = (d) => `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
+  return `${fmt(start)} – ${fmt(end)}`;
 }
 
 function escapeHtml(str) {
@@ -167,12 +199,14 @@ auth.onAuthStateChanged(async (user) => {
     listenUserEntries();
   } else {
     listenAllEntriesForEditor();
+    listenAllUsers();
   }
 });
 
 function cleanupListeners() {
   if (userEntriesUnsub) { userEntriesUnsub(); userEntriesUnsub = null; }
   if (allEntriesUnsub) { allEntriesUnsub(); allEntriesUnsub = null; }
+  if (allUsersUnsub) { allUsersUnsub(); allUsersUnsub = null; }
 }
 
 // ============================================================
@@ -181,23 +215,24 @@ function cleanupListeners() {
 function listenProjects() {
   db.collection('projects').orderBy('name').onSnapshot((snap) => {
     projectsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderProjectSelect();
     if (currentUser.role === 'editor') {
       renderProjectsTable();
       renderFilterProjectSelect();
+    } else {
+      renderWeekGrid();
     }
   });
 }
 
-function renderProjectSelect() {
-  const sel = $('entryProject');
-  if (!sel) return;
-  const active = projectsCache.filter(p => p.active !== false);
-  const current = sel.value;
-  sel.innerHTML = active.length
-    ? active.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')
-    : `<option value="">No active projects yet</option>`;
-  if (active.some(p => p.id === current)) sel.value = current;
+function isProjectVisibleToCurrentUser(p) {
+  return !p.assignedUserIds || p.assignedUserIds.length === 0 || p.assignedUserIds.includes(currentUser.uid);
+}
+
+function listenAllUsers() {
+  allUsersUnsub = db.collection('users').orderBy('name').onSnapshot((snap) => {
+    allUsersCache = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.role !== 'editor');
+    renderProjectsTable();
+  });
 }
 
 function renderFilterProjectSelect() {
@@ -211,20 +246,25 @@ function renderFilterProjectSelect() {
 function renderProjectsTable() {
   const tbody = $('projectsTable').querySelector('tbody');
   if (!projectsCache.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No projects yet — create the first one above.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No projects yet — create the first one above.</td></tr>`;
     return;
   }
-  tbody.innerHTML = projectsCache.map(p => `
+  tbody.innerHTML = projectsCache.map(p => {
+    const n = (p.assignedUserIds || []).length;
+    return `
     <tr>
       <td>${escapeHtml(p.name)}</td>
       <td>${escapeHtml(p.description || '')}</td>
       <td><span class="stamp-badge ${p.active === false ? 'stamp-badge-off' : ''}">${p.active === false ? 'Archived' : 'Active'}</span></td>
+      <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
       <td class="row-actions">
         <button class="link-btn" data-edit-project="${p.id}">Edit</button>
+        <button class="link-btn" data-access-project="${p.id}">Access</button>
         <button class="link-btn" data-toggle-project="${p.id}">${p.active === false ? 'Unarchive' : 'Archive'}</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 $('newProjectBtn').addEventListener('click', () => {
@@ -232,6 +272,7 @@ $('newProjectBtn').addEventListener('click', () => {
   $('projectId').value = '';
   $('projectName').value = '';
   $('projectDesc').value = '';
+  $('accessPanel').classList.add('hidden');
   $('projectForm').classList.remove('hidden');
   $('projectName').focus();
 });
@@ -250,7 +291,7 @@ $('projectForm').addEventListener('submit', async (e) => {
     await db.collection('projects').doc(editingProjectId).update({ name, description });
   } else {
     await db.collection('projects').add({
-      name, description, active: true,
+      name, description, active: true, assignedUserIds: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: currentUser.uid
     });
@@ -262,6 +303,7 @@ $('projectForm').addEventListener('submit', async (e) => {
 $('projectsTable').addEventListener('click', async (e) => {
   const editId = e.target.dataset.editProject;
   const toggleId = e.target.dataset.toggleProject;
+  const accessId = e.target.dataset.accessProject;
 
   if (editId) {
     const p = projectsCache.find(x => x.id === editId);
@@ -269,109 +311,146 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectId').value = editId;
     $('projectName').value = p.name;
     $('projectDesc').value = p.description || '';
+    $('accessPanel').classList.add('hidden');
     $('projectForm').classList.remove('hidden');
   }
   if (toggleId) {
     const p = projectsCache.find(x => x.id === toggleId);
     await db.collection('projects').doc(toggleId).update({ active: p.active === false ? true : false });
   }
-});
-
-// ============================================================
-// User: log hours
-// ============================================================
-$('entryDate').valueAsDate = new Date();
-
-$('entryForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const projectId = $('entryProject').value;
-  const project = projectsCache.find(p => p.id === projectId);
-  const date = $('entryDate').value;
-  const hours = parseFloat($('entryHours').value);
-  const note = $('entryNote').value.trim();
-
-  if (!projectId || !date || !hours || hours <= 0) return;
-
-  const payload = {
-    userId: currentUser.uid,
-    userName: currentUser.name,
-    projectId,
-    projectName: project ? project.name : '',
-    date, hours, note
-  };
-
-  if (editingEntryId) {
-    await db.collection('entries').doc(editingEntryId).update(payload);
-  } else {
-    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-    await db.collection('entries').add(payload);
+  if (accessId) {
+    openAccessPanel(accessId);
   }
-
-  const wasEditing = !!editingEntryId;
-  resetEntryForm();
-  showStamp(wasEditing ? 'Updated' : 'Logged');
 });
 
-$('cancelEditBtn').addEventListener('click', resetEntryForm);
-
-function resetEntryForm() {
-  editingEntryId = null;
-  $('entryForm').reset();
-  $('entryDate').valueAsDate = new Date();
-  $('cancelEditBtn').classList.add('hidden');
+function openAccessPanel(projectId) {
+  const p = projectsCache.find(x => x.id === projectId);
+  accessProjectId = projectId;
+  $('accessProjectName').textContent = p.name;
+  const assigned = new Set(p.assignedUserIds || []);
+  $('accessCheckboxes').innerHTML = allUsersCache.length
+    ? allUsersCache.map(u => `
+        <label class="checkbox-row">
+          <input type="checkbox" value="${u.uid}" ${assigned.has(u.uid) ? 'checked' : ''} />
+          ${escapeHtml(u.name)}
+        </label>`).join('')
+    : `<p class="empty-state">No one has signed up yet — once your team creates accounts, they'll show up here.</p>`;
+  $('projectForm').classList.add('hidden');
+  $('accessPanel').classList.remove('hidden');
 }
+
+$('saveAccessBtn').addEventListener('click', async () => {
+  const checked = [...$('accessCheckboxes').querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
+  await db.collection('projects').doc(accessProjectId).update({ assignedUserIds: checked });
+  $('accessPanel').classList.add('hidden');
+  showStamp('Saved');
+});
+
+$('cancelAccessBtn').addEventListener('click', () => $('accessPanel').classList.add('hidden'));
+
+// ============================================================
+// User: weekly hours grid
+// ============================================================
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+$('weekPrevBtn').addEventListener('click', () => { weekStart = addDays(weekStart, -7); renderWeekGrid(); });
+$('weekNextBtn').addEventListener('click', () => { weekStart = addDays(weekStart, 7); renderWeekGrid(); });
+$('weekTodayBtn').addEventListener('click', () => { weekStart = getMonday(new Date()); renderWeekGrid(); });
 
 function listenUserEntries() {
   userEntriesUnsub = db.collection('entries')
     .where('userId', '==', currentUser.uid)
     .onSnapshot((snap) => {
-      const entries = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => b.date.localeCompare(a.date));
-      renderUserEntries(entries);
+      userEntriesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderWeekGrid();
     });
 }
 
-function renderUserEntries(entries) {
-  const tbody = $('userEntriesTable').querySelector('tbody');
-  $('userEmptyState').classList.toggle('hidden', entries.length > 0);
+function renderWeekGrid() {
+  if (!currentUser || currentUser.role !== 'user') return;
 
-  tbody.innerHTML = entries.map(en => `
-    <tr>
-      <td>${formatDate(en.date)}</td>
-      <td>${escapeHtml(en.projectName)}</td>
-      <td class="num">${en.hours}</td>
-      <td class="note-cell">${escapeHtml(en.note || '')}</td>
-      <td class="row-actions">
-        <button class="link-btn" data-edit-entry="${en.id}">Edit</button>
-        <button class="link-btn link-danger" data-delete-entry="${en.id}">Delete</button>
-      </td>
-    </tr>
-  `).join('');
+  $('weekLabel').textContent = weekRangeLabel(weekStart);
 
-  const ym = new Date().toISOString().slice(0, 7);
-  const monthTotal = entries.filter(en => en.date.startsWith(ym)).reduce((s, en) => s + en.hours, 0);
-  $('userMonthTotal').textContent = trimZeros(monthTotal);
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const dateStrs = weekDates.map(toISODate);
 
-  tbody.querySelectorAll('[data-edit-entry]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const en = entries.find(x => x.id === btn.dataset.editEntry);
-      editingEntryId = en.id;
-      $('entryProject').value = en.projectId;
-      $('entryDate').value = en.date;
-      $('entryHours').value = en.hours;
-      $('entryNote').value = en.note || '';
-      $('cancelEditBtn').classList.remove('hidden');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  });
-  tbody.querySelectorAll('[data-delete-entry]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (confirm('Delete this entry?')) {
-        await db.collection('entries').doc(btn.dataset.deleteEntry).delete();
+  $('weekGridHeadRow').innerHTML = '<th>Project</th>' +
+    weekDates.map((d, i) => `<th class="num ${i >= 5 ? 'weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth() + 1}</span></th>`).join('') +
+    '<th class="num">Total</th>';
+
+  const visibleProjects = projectsCache.filter(p => p.active !== false && isProjectVisibleToCurrentUser(p));
+  const hasProjects = visibleProjects.length > 0;
+  $('noProjectsState').classList.toggle('hidden', hasProjects);
+  $('weekGridTable').classList.toggle('hidden', !hasProjects);
+
+  const entryFor = (projectId, date) => userEntriesCache.find(en => en.projectId === projectId && en.date === date);
+
+  $('weekGridBody').innerHTML = visibleProjects.map(p => {
+    let rowTotal = 0;
+    const cells = dateStrs.map((ds, i) => {
+      const en = entryFor(p.id, ds);
+      const hours = en ? en.hours : 0;
+      rowTotal += hours;
+      return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
+        data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
+    }).join('');
+    return `<tr><td>${escapeHtml(p.name)}</td>${cells}<td class="num row-total">${trimZeros(rowTotal)}</td></tr>`;
+  }).join('');
+
+  const dayTotals = dateStrs.map(ds =>
+    visibleProjects.reduce((sum, p) => {
+      const en = entryFor(p.id, ds);
+      return sum + (en ? en.hours : 0);
+    }, 0)
+  );
+  const grandTotal = dayTotals.reduce((s, n) => s + n, 0);
+  $('weekGridFoot').innerHTML = `<tr class="totals-row"><td>Total</td>` +
+    dayTotals.map((t, i) => `<td class="num ${i >= 5 ? 'weekend' : ''}">${trimZeros(t)}</td>`).join('') +
+    `<td class="num">${trimZeros(grandTotal)}</td></tr>`;
+}
+
+$('weekGridBody').addEventListener('change', async (e) => {
+  const input = e.target;
+  if (!(input.matches && input.matches('input[data-project]'))) return;
+
+  const projectId = input.dataset.project;
+  const date = input.dataset.date;
+  const raw = input.value.trim();
+
+  if (raw !== '' && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) {
+    input.value = '';
+    return;
+  }
+  const hours = raw === '' ? 0 : parseFloat(raw);
+  const project = projectsCache.find(p => p.id === projectId);
+  const existing = userEntriesCache.find(en => en.projectId === projectId && en.date === date);
+
+  input.disabled = true;
+  try {
+    if (hours === 0) {
+      if (existing) await db.collection('entries').doc(existing.id).delete();
+    } else {
+      const payload = {
+        userId: currentUser.uid,
+        userName: currentUser.name,
+        projectId,
+        projectName: project ? project.name : '',
+        date,
+        hours
+      };
+      if (existing) {
+        await db.collection('entries').doc(existing.id).update(payload);
+      } else {
+        payload.note = '';
+        payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection('entries').add(payload);
       }
-    });
-  });
-}
+      showStamp('Saved');
+    }
+  } finally {
+    input.disabled = false;
+  }
+});
 
 function trimZeros(n) {
   return n.toFixed(2).replace(/\.?0+$/, '') || '0';
@@ -440,7 +519,7 @@ $('exportCsvBtn').addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `timeledger-export-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `hourpower-export-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 });

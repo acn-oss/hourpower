@@ -1,4 +1,4 @@
-# TimeLedger
+# Hour Power
 
 A small hour-registration app: people log in, log hours against projects,
 and you (the editor) see everyone's entries in one place. No build tools,
@@ -12,7 +12,7 @@ Total setup time: about 10–15 minutes, once.
 ## 1. Create a free Firebase project
 
 1. Go to [console.firebase.google.com](https://console.firebase.google.com) and sign in with a Google account.
-2. Click **Add project**, give it a name (e.g. `timeledger`), and finish the wizard (you can skip Google Analytics).
+2. Click **Add project**, give it a name (e.g. `hour-power`), and finish the wizard (you can skip Google Analytics).
 3. In the left sidebar, go to **Security → Authentication → Get started**.
    - Under **Sign-in method**, enable **Email/Password**.
 4. In the left sidebar, go to **Databases & Storage → Firestore → Create database**.
@@ -59,7 +59,7 @@ Then visit `http://localhost:8000`. Sign up with your admin email first — you 
    cd hour-tracker
    git init
    git add .
-   git commit -m "TimeLedger"
+   git commit -m "Hour Power"
    git branch -M main
    git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO.git
    git push -u origin main
