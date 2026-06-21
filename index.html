@@ -138,6 +138,19 @@
 
       <div class="card">
         <div class="card-header-row">
+          <h2>Employee rates</h2>
+        </div>
+        <p class="access-intro">Cost rate and sales rate are only visible to you here — employees never see these numbers, even their own.</p>
+        <div class="table-wrap">
+          <table class="ledger-table" id="ratesTable">
+            <thead><tr><th>Employee</th><th class="num">Cost rate (DKK/h)</th><th class="num">Sales rate (DKK/h)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row">
           <h2>All entries</h2>
           <span class="total-pill">Total: <strong id="allEntriesTotal">0</strong>h</span>
         </div>
@@ -165,6 +178,26 @@
           </table>
         </div>
         <p id="allEmptyState" class="empty-state hidden">No entries match these filters.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Project totals</h2>
+        </div>
+        <div class="filters">
+          <label>Project
+            <select id="totalsProjectSelect"><option value="">Choose a project…</option></select>
+          </label>
+        </div>
+        <p id="totalsHint" class="empty-state">Choose a project above to see cost and sales totals per employee.</p>
+        <p id="totalsEmptyState" class="empty-state hidden">No hours logged to this project yet.</p>
+        <div class="table-wrap">
+          <table class="ledger-table hidden" id="projectTotalsTable">
+            <thead><tr><th>Employee</th><th class="num">Hours</th><th class="num">Cost price</th><th class="num">Sales price</th><th class="num">Margin</th></tr></thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </div>
       </div>
 
     </section>

@@ -24,11 +24,13 @@ let currentUser = null;      // { uid, name, email, role }
 let projectsCache = [];      // [{id, name, description, active, assignedUserIds}]
 let userEntriesCache = [];   // current user's entries (all dates)
 let allEntriesCache = [];
-let allUsersCache = [];      // editor only: everyone except editors, for the access panel
+let allUsersCache = [];      // editor only: everyone except editors, for the access panel & rates
+let ratesCache = {};         // editor only: { uid: {costRate, salesRate} }
 let filteredRows = [];
 let userEntriesUnsub = null;
 let allEntriesUnsub = null;
 let allUsersUnsub = null;
+let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
 let weekStart = getMonday(new Date());
@@ -208,6 +210,7 @@ auth.onAuthStateChanged(async (user) => {
   } else {
     listenAllEntriesForEditor();
     listenAllUsers();
+    listenRates();
   }
 });
 
@@ -215,6 +218,7 @@ function cleanupListeners() {
   if (userEntriesUnsub) { userEntriesUnsub(); userEntriesUnsub = null; }
   if (allEntriesUnsub) { allEntriesUnsub(); allEntriesUnsub = null; }
   if (allUsersUnsub) { allUsersUnsub(); allUsersUnsub = null; }
+  if (ratesUnsub) { ratesUnsub(); ratesUnsub = null; }
 }
 
 // ============================================================
@@ -248,13 +252,126 @@ function listenAllUsers() {
   allUsersUnsub = db.collection('users').orderBy('name').onSnapshot((snap) => {
     allUsersCache = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.role !== 'editor');
     renderProjectsTable();
+    renderRatesTable();
   });
 }
 
+function listenRates() {
+  ratesUnsub = db.collection('rates').onSnapshot((snap) => {
+    ratesCache = {};
+    snap.docs.forEach(d => { ratesCache[d.id] = d.data(); });
+    renderRatesTable();
+    renderProjectTotals();
+  });
+}
+
+function renderRatesTable() {
+  const tbody = $('ratesTable').querySelector('tbody');
+  if (!allUsersCache.length) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">No one has signed up yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = allUsersCache.map(u => {
+    const r = ratesCache[u.uid] || {};
+    return `
+    <tr>
+      <td>${escapeHtml(u.name)}</td>
+      <td class="num"><input type="number" min="0" step="1" class="rate-input"
+        data-rate-uid="${u.uid}" data-rate-field="costRate" value="${r.costRate ?? ''}" /></td>
+      <td class="num"><input type="number" min="0" step="1" class="rate-input"
+        data-rate-uid="${u.uid}" data-rate-field="salesRate" value="${r.salesRate ?? ''}" /></td>
+    </tr>`;
+  }).join('');
+}
+
+$('ratesTable').addEventListener('change', async (e) => {
+  const input = e.target;
+  if (!(input.matches && input.matches('input[data-rate-uid]'))) return;
+
+  const uid = input.dataset.rateUid;
+  const field = input.dataset.rateField;
+  const raw = input.value.trim();
+  if (raw !== '' && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) {
+    input.value = '';
+    return;
+  }
+  const value = raw === '' ? 0 : parseFloat(raw);
+
+  input.disabled = true;
+  try {
+    await db.collection('rates').doc(uid).set({ [field]: value }, { merge: true });
+    showStamp('Saved');
+  } finally {
+    input.disabled = false;
+  }
+});
+
+function formatDkk(n) {
+  return n.toLocaleString('da-DK', { maximumFractionDigits: 0 }) + ' kr.';
+}
+
+function renderProjectTotals() {
+  const projectId = $('totalsProjectSelect').value;
+  const tbody = $('projectTotalsTable').querySelector('tbody');
+  const tfoot = $('projectTotalsTable').querySelector('tfoot');
+
+  if (!projectId) {
+    $('totalsHint').classList.remove('hidden');
+    $('totalsEmptyState').classList.add('hidden');
+    $('projectTotalsTable').classList.add('hidden');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+    return;
+  }
+  $('totalsHint').classList.add('hidden');
+
+  const byUser = {};
+  allEntriesCache.filter(en => en.projectId === projectId).forEach(en => {
+    if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, hours: 0 };
+    byUser[en.userId].hours += en.hours;
+  });
+
+  const userIds = Object.keys(byUser).sort((a, b) => byUser[a].userName.localeCompare(byUser[b].userName));
+  $('totalsEmptyState').classList.toggle('hidden', userIds.length > 0);
+  $('projectTotalsTable').classList.toggle('hidden', userIds.length === 0);
+
+  let totalHours = 0, totalCost = 0, totalSales = 0;
+  tbody.innerHTML = userIds.map(uid => {
+    const { userName, hours } = byUser[uid];
+    const rate = ratesCache[uid] || {};
+    const cost = hours * (rate.costRate || 0);
+    const sales = hours * (rate.salesRate || 0);
+    totalHours += hours; totalCost += cost; totalSales += sales;
+    return `
+    <tr>
+      <td>${escapeHtml(userName)}</td>
+      <td class="num">${trimZeros(hours)}</td>
+      <td class="num">${formatDkk(cost)}</td>
+      <td class="num">${formatDkk(sales)}</td>
+      <td class="num">${formatDkk(sales - cost)}</td>
+    </tr>`;
+  }).join('');
+
+  tfoot.innerHTML = `
+    <tr class="totals-row">
+      <td>Total</td>
+      <td class="num">${trimZeros(totalHours)}</td>
+      <td class="num">${formatDkk(totalCost)}</td>
+      <td class="num">${formatDkk(totalSales)}</td>
+      <td class="num">${formatDkk(totalSales - totalCost)}</td>
+    </tr>`;
+}
+
+$('totalsProjectSelect').addEventListener('change', renderProjectTotals);
+
 function renderFilterProjectSelect() {
-  const sel = $('filterProject');
+  populateProjectSelect($('filterProject'), 'All projects');
+  populateProjectSelect($('totalsProjectSelect'), 'Choose a project…');
+}
+
+function populateProjectSelect(sel, placeholder) {
   const current = sel.value;
-  sel.innerHTML = '<option value="">All projects</option>' +
+  sel.innerHTML = `<option value="">${placeholder}</option>` +
     projectsCache.map(p => `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('');
   sel.value = current;
 }
@@ -488,6 +605,7 @@ function listenAllEntriesForEditor() {
     allEntriesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderFilterUserSelect();
     renderAllEntries();
+    renderProjectTotals();
   });
 }
 
