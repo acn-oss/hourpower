@@ -285,9 +285,9 @@ function renderRatesTable() {
     <tr>
       <td>${escapeHtml(u.name)}</td>
       <td class="num"><input type="number" min="0" step="1" class="rate-input"
-        data-rate-uid="${u.uid}" data-rate-field="costRate" value="${r.costRate ?? ''}" /></td>
-      <td class="num"><input type="number" min="0" step="1" class="rate-input"
         data-rate-uid="${u.uid}" data-rate-field="salesRate" value="${r.salesRate ?? ''}" /></td>
+      <td class="num"><input type="number" min="0" step="1" class="rate-input"
+        data-rate-uid="${u.uid}" data-rate-field="costRate" value="${r.costRate ?? ''}" /></td>
     </tr>`;
   }).join('');
 }
@@ -351,6 +351,7 @@ function renderProjectTotals() {
     $('totalsHint').classList.remove('hidden');
     $('totalsEmptyState').classList.add('hidden');
     $('projectTotalsTable').classList.add('hidden');
+    $('projectSummary').classList.add('hidden');
     tbody.innerHTML = '';
     tfoot.innerHTML = '';
     return;
@@ -379,8 +380,8 @@ function renderProjectTotals() {
     <tr>
       <td>${escapeHtml(userName)}</td>
       <td class="num">${trimZeros(hours)}</td>
-      <td class="num">${formatDkk(cost)}</td>
       <td class="num">${formatDkk(sales)}</td>
+      <td class="num">${formatDkk(cost)}</td>
       <td class="num">${formatDkk(sales - cost)}</td>
     </tr>`;
   }).join('');
@@ -389,10 +390,25 @@ function renderProjectTotals() {
     <tr class="totals-row">
       <td>Total</td>
       <td class="num">${trimZeros(totalHours)}</td>
-      <td class="num">${formatDkk(totalCost)}</td>
       <td class="num">${formatDkk(totalSales)}</td>
+      <td class="num">${formatDkk(totalCost)}</td>
       <td class="num">${formatDkk(totalSales - totalCost)}</td>
     </tr>`;
+
+  // Project-level fee summary: expected fee, subadvisors, net fee, margin, factor
+  const expectedFee = (project && project.expectedFee) || 0;
+  const subadvisors = (project && project.subadvisors) || 0;
+  const netFee = expectedFee - subadvisors;
+  const margin = netFee - totalCost;
+  const factor = totalCost > 0 ? (netFee / totalCost) : null;
+
+  $('projectSummary').classList.remove('hidden');
+  $('sumExpectedFee').textContent = formatDkk(expectedFee);
+  $('sumSubadvisors').textContent = formatDkk(subadvisors);
+  $('sumNetFee').textContent = formatDkk(netFee);
+  $('sumCostPrice').textContent = formatDkk(totalCost);
+  $('sumMargin').textContent = formatDkk(margin);
+  $('sumFactor').textContent = factor === null ? '—' : `${factor.toFixed(1)}x`;
 }
 
 $('totalsProjectSelect').addEventListener('change', renderProjectTotals);
@@ -441,6 +457,8 @@ $('newProjectBtn').addEventListener('click', () => {
   $('projectCode').value = '';
   $('projectClient').value = '';
   $('projectDesc').value = '';
+  $('projectExpectedFee').value = '';
+  $('projectSubadvisors').value = '';
   clearRateLineInputs();
   $('accessPanel').classList.add('hidden');
   $('projectForm').classList.remove('hidden');
@@ -491,15 +509,19 @@ $('projectForm').addEventListener('submit', async (e) => {
   const code = $('projectCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
   const client = $('projectClient').value.trim();
   const description = $('projectDesc').value.trim();
+  const expectedFee = parseNonNegative($('projectExpectedFee').value);
+  const subadvisors = parseNonNegative($('projectSubadvisors').value);
   const rateLines = readRateLineInputs();
   if (!name) return;
   $('projectCode').value = code;
 
   if (editingProjectId) {
-    await db.collection('projects').doc(editingProjectId).update({ name, code, client, description, rateLines });
+    await db.collection('projects').doc(editingProjectId)
+      .update({ name, code, client, description, expectedFee, subadvisors, rateLines });
   } else {
     await db.collection('projects').add({
-      name, code, client, description, rateLines, active: true, assignedUserIds: [],
+      name, code, client, description, expectedFee, subadvisors, rateLines,
+      active: true, assignedUserIds: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: currentUser.uid
     });
@@ -507,6 +529,11 @@ $('projectForm').addEventListener('submit', async (e) => {
   $('projectForm').classList.add('hidden');
   showStamp('Saved');
 });
+
+function parseNonNegative(raw) {
+  const v = parseFloat(String(raw).trim());
+  return (!isNaN(v) && v >= 0) ? v : 0;
+}
 
 $('projectsTable').addEventListener('click', async (e) => {
   const editId = e.target.dataset.editProject;
@@ -521,6 +548,8 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectCode').value = p.code || '';
     $('projectClient').value = p.client || '';
     $('projectDesc').value = p.description || '';
+    $('projectExpectedFee').value = p.expectedFee || '';
+    $('projectSubadvisors').value = p.subadvisors || '';
     fillRateLineInputs(p.rateLines);
     $('accessPanel').classList.add('hidden');
     $('projectForm').classList.remove('hidden');

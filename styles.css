@@ -541,6 +541,36 @@ input, select, textarea {
 }
 .rate-lines-table td { padding: 6px 10px; }
 
+/* ==========================================================
+   Project financial summary (Expected fee / Margin / Factor)
+   ========================================================== */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 14px;
+  margin: 4px 0 20px;
+  padding: 14px 16px;
+  background: var(--accent-soft);
+  border-radius: 8px;
+}
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.summary-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+}
+.summary-value {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+
 @media (max-width: 480px) {
   .auth-card { padding: 30px 22px 26px; }
   .topbar { padding: 12px 16px; }

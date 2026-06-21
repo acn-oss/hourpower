@@ -113,6 +113,14 @@
           <label>Description <span class="optional">optional</span>
             <input type="text" id="projectDesc" />
           </label>
+          <div class="field-row">
+            <label>Expected fee (DKK) <span class="optional">optional</span>
+              <input type="number" min="0" step="1" id="projectExpectedFee" placeholder="0" />
+            </label>
+            <label>Subadvisors (DKK) <span class="optional">optional</span>
+              <input type="number" min="0" step="1" id="projectSubadvisors" placeholder="0" />
+            </label>
+          </div>
 
           <div class="rate-lines-section">
             <p class="access-intro">Project-specific rates <span class="optional">optional — overrides the employee's standard rate from each "used from" date onward, including hours already logged. Leave a row blank to skip it.</span></p>
@@ -157,10 +165,10 @@
         <div class="card-header-row">
           <h2>Employee rates</h2>
         </div>
-        <p class="access-intro">Cost rate and sales rate are only visible to you here — employees never see these numbers, even their own.</p>
+        <p class="access-intro">Sales rate and cost rate are only visible to you here — employees never see these numbers, even their own.</p>
         <div class="table-wrap">
           <table class="ledger-table" id="ratesTable">
-            <thead><tr><th>Employee</th><th class="num">Cost rate (DKK/h)</th><th class="num">Sales rate (DKK/h)</th></tr></thead>
+            <thead><tr><th>Employee</th><th class="num">Sales rate (DKK/h)</th><th class="num">Cost rate (DKK/h)</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -208,9 +216,19 @@
         </div>
         <p id="totalsHint" class="empty-state">Choose a project above to see cost and sales totals per employee.</p>
         <p id="totalsEmptyState" class="empty-state hidden">No hours logged to this project yet.</p>
+
+        <div id="projectSummary" class="summary-grid hidden">
+          <div class="summary-item"><span class="summary-label">Expected fee</span><span class="summary-value" id="sumExpectedFee">–</span></div>
+          <div class="summary-item"><span class="summary-label">Subadvisors</span><span class="summary-value" id="sumSubadvisors">–</span></div>
+          <div class="summary-item"><span class="summary-label">Net fee</span><span class="summary-value" id="sumNetFee">–</span></div>
+          <div class="summary-item"><span class="summary-label">Cost price</span><span class="summary-value" id="sumCostPrice">–</span></div>
+          <div class="summary-item"><span class="summary-label">Margin</span><span class="summary-value" id="sumMargin">–</span></div>
+          <div class="summary-item"><span class="summary-label">Factor</span><span class="summary-value" id="sumFactor">–</span></div>
+        </div>
+
         <div class="table-wrap">
           <table class="ledger-table hidden" id="projectTotalsTable">
-            <thead><tr><th>Employee</th><th class="num">Hours</th><th class="num">Cost price</th><th class="num">Sales price</th><th class="num">Margin</th></tr></thead>
+            <thead><tr><th>Employee</th><th class="num">Hours</th><th class="num">Sales price</th><th class="num">Cost price</th><th class="num">Margin</th></tr></thead>
             <tbody></tbody>
             <tfoot></tfoot>
           </table>
