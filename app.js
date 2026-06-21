@@ -262,6 +262,14 @@ function listenRates() {
     snap.docs.forEach(d => { ratesCache[d.id] = d.data(); });
     renderRatesTable();
     renderProjectTotals();
+  }, (err) => {
+    console.error('rates listener error:', err);
+    if (err.code === 'permission-denied') {
+      alert(
+        "Can't load employee rates — Firestore is denying access.\n\n" +
+        "Repaste firestore.rules into Firebase Console → Databases & Storage → Firestore → Rules → Publish, then refresh this page."
+      );
+    }
   });
 }
 
@@ -301,6 +309,14 @@ $('ratesTable').addEventListener('change', async (e) => {
   try {
     await db.collection('rates').doc(uid).set({ [field]: value }, { merge: true });
     showStamp('Saved');
+  } catch (err) {
+    alert(
+      "That rate didn't save.\n\n" +
+      (err.code === 'permission-denied'
+        ? "This usually means the Firestore security rules haven't been updated yet for the rates feature — repaste firestore.rules into Firebase Console → Databases & Storage → Firestore → Rules → Publish."
+        : err.message)
+    );
+    input.value = '';
   } finally {
     input.disabled = false;
   }
