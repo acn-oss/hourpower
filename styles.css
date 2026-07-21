@@ -614,6 +614,33 @@ button.card-header-row.card-toggle:focus-visible { outline: 2px solid var(--acce
 }
 .chevron.collapsed { transform: rotate(-90deg); }
 
+/* ==========================================================
+   Weekly overview status badges
+   ========================================================== */
+.status-ok {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.status-warn {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--stamp);
+  background: #FAF0E4;
+  border: 1.5px solid var(--stamp);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
 @media (max-width: 480px) {
   .auth-card { padding: 30px 22px 26px; }
   .topbar { padding: 12px 16px; }

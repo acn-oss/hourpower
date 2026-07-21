@@ -167,6 +167,25 @@
 
       <div class="card">
         <div class="card-header-row">
+          <h2>Weekly overview</h2>
+          <div class="week-nav">
+            <button id="editorWeekPrevBtn" class="btn btn-ghost" type="button">‹</button>
+            <span id="editorWeekLabel" class="week-label"></span>
+            <button id="editorWeekNextBtn" class="btn btn-ghost" type="button">›</button>
+            <button id="editorWeekTodayBtn" class="btn btn-ghost" type="button">This week</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="ledger-table" id="weekOverviewTable">
+            <thead><tr><th>Employee</th><th class="num">Hours logged</th><th>Status</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="weekOverviewEmpty" class="empty-state hidden">No employee accounts yet.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row">
           <h2>Project totals</h2>
         </div>
         <div class="filters">

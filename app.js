@@ -34,6 +34,7 @@ let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
 let weekStart = getMonday(new Date());
+let editorWeekStart = getMonday(new Date());
 
 function showStamp(text) {
   const el = $('stamp');
@@ -287,7 +288,47 @@ function listenAllUsers() {
     allUsersCache = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.role !== 'editor');
     renderProjectsTable();
     renderRatesTable();
+    renderWeekOverview();
   });
+}
+
+// ============================================================
+// Editor: weekly overview — flags employees with zero hours
+// ============================================================
+$('editorWeekPrevBtn').addEventListener('click', () => { editorWeekStart = addDays(editorWeekStart, -7); renderWeekOverview(); });
+$('editorWeekNextBtn').addEventListener('click', () => { editorWeekStart = addDays(editorWeekStart, 7); renderWeekOverview(); });
+$('editorWeekTodayBtn').addEventListener('click', () => { editorWeekStart = getMonday(new Date()); renderWeekOverview(); });
+
+function renderWeekOverview() {
+  const weekEnd = addDays(editorWeekStart, 6);
+  const startStr = toISODate(editorWeekStart);
+  const endStr = toISODate(weekEnd);
+  $('editorWeekLabel').textContent = `Week ${isoWeekNumber(editorWeekStart)} · ${weekRangeLabel(editorWeekStart)}`;
+
+  const tbody = $('weekOverviewTable').querySelector('tbody');
+  $('weekOverviewEmpty').classList.toggle('hidden', allUsersCache.length > 0);
+  $('weekOverviewTable').classList.toggle('hidden', allUsersCache.length === 0);
+
+  // Sum hours per user for this week
+  const hoursByUser = {};
+  allEntriesCache.forEach(en => {
+    if (en.date >= startStr && en.date <= endStr) {
+      hoursByUser[en.userId] = (hoursByUser[en.userId] || 0) + en.hours;
+    }
+  });
+
+  tbody.innerHTML = allUsersCache.map(u => {
+    const hours = hoursByUser[u.uid] || 0;
+    const status = hours > 0
+      ? `<span class="status-ok">✓ ${trimZeros(hours)}h logged</span>`
+      : `<span class="status-warn">⚠ No hours logged</span>`;
+    return `
+    <tr>
+      <td>${escapeHtml(u.name)}</td>
+      <td class="num">${hours > 0 ? trimZeros(hours) : '–'}</td>
+      <td>${status}</td>
+    </tr>`;
+  }).join('');
 }
 
 function listenRates() {
@@ -740,6 +781,7 @@ function listenAllEntriesForEditor() {
     renderFilterUserSelect();
     renderAllEntries();
     renderProjectTotals();
+    renderWeekOverview();
   });
 }
 
