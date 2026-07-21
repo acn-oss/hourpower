@@ -38,6 +38,18 @@
   </div>
 </section>
 
+<!-- VERIFICATION SCREEN -->
+<section id="verifyScreen" class="auth-screen hidden">
+  <div class="ledger-bg" aria-hidden="true"></div>
+  <div class="auth-card">
+    <h1 class="brand">Check your email</h1>
+    <p class="brand-sub">A verification link has been sent to <strong id="verifyEmail"></strong>. Click it, then come back here and sign in.</p>
+    <div id="verifyError" class="form-error hidden"></div>
+    <button id="resendVerifyBtn" class="btn btn-primary btn-block" type="button">Resend verification email</button>
+    <button id="verifyLogoutBtn" class="btn btn-ghost btn-block" style="margin-top:10px" type="button">Back to sign in</button>
+  </div>
+</section>
+
 <!-- APP SCREEN -->
 <div id="appScreen" class="app-screen hidden">
   <header class="topbar">
