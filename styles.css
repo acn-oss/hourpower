@@ -156,6 +156,13 @@ input, select, textarea {
 }
 .link-danger { color: var(--danger); }
 
+.contact-admin {
+  margin-top: 16px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
 /* ==========================================================
    App shell
    ========================================================== */

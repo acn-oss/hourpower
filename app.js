@@ -10,7 +10,7 @@ const $ = (id) => document.getElementById(id);
 const setupNotice = $('setupNotice');
 if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {
   setupNotice.classList.remove('hidden');
-  document.querySelectorAll('#loginForm input, #loginForm button, #signupForm input, #signupForm button')
+  document.querySelectorAll('#loginForm input, #loginForm button')
     .forEach(el => el.disabled = true);
   throw new Error('Hour Power: fill in config.js with your Firebase project keys before using the app.');
 }
@@ -34,10 +34,6 @@ let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
 let weekStart = getMonday(new Date());
-
-function isAdminEmail(email) {
-  return ADMIN_EMAILS.map(e => e.toLowerCase()).includes((email || '').toLowerCase());
-}
 
 function showStamp(text) {
   const el = $('stamp');
@@ -106,17 +102,6 @@ function csvSafe(s) {
 // Auth screen
 // ============================================================
 const loginForm = $('loginForm');
-const signupForm = $('signupForm');
-const toggleBtn = $('toggleAuthMode');
-let showingLogin = true;
-
-toggleBtn.addEventListener('click', () => {
-  showingLogin = !showingLogin;
-  loginForm.classList.toggle('hidden', !showingLogin);
-  signupForm.classList.toggle('hidden', showingLogin);
-  toggleBtn.textContent = showingLogin ? 'Need an account? Create one' : 'Already have an account? Sign in';
-  $('authError').classList.add('hidden');
-});
 
 function showAuthError(msg) {
   const el = $('authError');
@@ -148,25 +133,6 @@ loginForm.addEventListener('submit', async (e) => {
   }
 });
 
-signupForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  $('authError').classList.add('hidden');
-  const name = $('signupName').value.trim();
-  const email = $('signupEmail').value.trim();
-  const password = $('signupPassword').value;
-  try {
-    const cred = await auth.createUserWithEmailAndPassword(email, password);
-    await cred.user.updateProfile({ displayName: name });
-    const role = isAdminEmail(email) ? 'editor' : 'user';
-    await db.collection('users').doc(cred.user.uid).set({
-      name, email, role,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-  } catch (err) {
-    showAuthError(friendlyAuthError(err));
-  }
-});
-
 $('logoutBtn').addEventListener('click', () => auth.signOut());
 
 // ============================================================
@@ -184,11 +150,12 @@ auth.onAuthStateChanged(async (user) => {
 
   let userDoc = await db.collection('users').doc(user.uid).get();
   if (!userDoc.exists) {
-    const role = isAdminEmail(user.email) ? 'editor' : 'user';
+    // New account created by the editor in Firebase Console — default role is user.
+    // To promote someone to editor, update their role field in Firestore Console.
     await db.collection('users').doc(user.uid).set({
       name: user.displayName || user.email,
       email: user.email,
-      role,
+      role: 'user',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     userDoc = await db.collection('users').doc(user.uid).get();
