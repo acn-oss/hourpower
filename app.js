@@ -134,28 +134,6 @@ loginForm.addEventListener('submit', async (e) => {
 });
 
 $('logoutBtn').addEventListener('click', () => auth.signOut());
-$('verifyLogoutBtn').addEventListener('click', () => auth.signOut());
-
-$('resendVerifyBtn').addEventListener('click', async () => {
-  const user = auth.currentUser;
-  if (!user) return;
-  try {
-    await user.sendEmailVerification();
-    $('verifyError').classList.add('hidden');
-    $('resendVerifyBtn').textContent = 'Email sent ✓';
-    $('resendVerifyBtn').disabled = true;
-    setTimeout(() => {
-      $('resendVerifyBtn').textContent = 'Resend verification email';
-      $('resendVerifyBtn').disabled = false;
-    }, 30000);
-  } catch (err) {
-    const el = $('verifyError');
-    el.textContent = err.code === 'auth/too-many-requests'
-      ? 'Please wait a moment before requesting another email.'
-      : err.message;
-    el.classList.remove('hidden');
-  }
-});
 
 // ============================================================
 // Auth state → route to the right view
@@ -166,23 +144,7 @@ auth.onAuthStateChanged(async (user) => {
   if (!user) {
     currentUser = null;
     $('authScreen').classList.remove('hidden');
-    $('verifyScreen').classList.add('hidden');
     $('appScreen').classList.add('hidden');
-    return;
-  }
-
-  // Block unverified accounts — send them a verification email first
-  if (!user.emailVerified) {
-    $('authScreen').classList.add('hidden');
-    $('verifyScreen').classList.remove('hidden');
-    $('appScreen').classList.add('hidden');
-    $('verifyEmail').textContent = user.email;
-    try {
-      await user.sendEmailVerification();
-    } catch (err) {
-      // Don't throw — they may have already been sent one recently (rate limited)
-      if (err.code !== 'auth/too-many-requests') console.warn('sendEmailVerification:', err.message);
-    }
     return;
   }
 
@@ -203,7 +165,6 @@ auth.onAuthStateChanged(async (user) => {
   currentUser = { uid: user.uid, name: data.name, email: data.email, role: data.role };
 
   $('authScreen').classList.add('hidden');
-  $('verifyScreen').classList.add('hidden');
   $('appScreen').classList.remove('hidden');
   $('whoami').textContent = `${currentUser.name}${currentUser.role === 'editor' ? ' · editor' : ''}`;
 
