@@ -10,7 +10,7 @@ const $ = (id) => document.getElementById(id);
 const setupNotice = $('setupNotice');
 if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {
   setupNotice.classList.remove('hidden');
-  document.querySelectorAll('#loginForm input, #loginForm button')
+  document.querySelectorAll('#loginForm input, #loginForm button, #signupForm input, #signupForm button')
     .forEach(el => el.disabled = true);
   throw new Error('Hour Power: fill in config.js with your Firebase project keys before using the app.');
 }
@@ -103,6 +103,18 @@ function csvSafe(s) {
 // Auth screen
 // ============================================================
 const loginForm = $('loginForm');
+const signupForm = $('signupForm');
+let showingLogin = true;
+
+$('toggleAuthMode').addEventListener('click', () => {
+  showingLogin = !showingLogin;
+  loginForm.classList.toggle('hidden', !showingLogin);
+  signupForm.classList.toggle('hidden', showingLogin);
+  $('toggleAuthMode').textContent = showingLogin ? 'Need an account? Create one' : 'Already have an account? Sign in';
+  $('authError').classList.add('hidden');
+});
+
+const ALLOWED_DOMAIN = 'urbanpower.dk';
 
 function showAuthError(msg) {
   const el = $('authError');
@@ -129,6 +141,32 @@ loginForm.addEventListener('submit', async (e) => {
   const password = $('loginPassword').value;
   try {
     await auth.signInWithEmailAndPassword(email, password);
+  } catch (err) {
+    showAuthError(friendlyAuthError(err));
+  }
+});
+
+signupForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('authError').classList.add('hidden');
+  const name = $('signupName').value.trim();
+  const email = $('signupEmail').value.trim().toLowerCase();
+  const password = $('signupPassword').value;
+
+  // Enforce domain
+  if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
+    showAuthError(`Only @${ALLOWED_DOMAIN} email addresses can sign up.`);
+    return;
+  }
+
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, password);
+    await cred.user.updateProfile({ displayName: name });
+    // Always role: user — editors are promoted manually in Firestore
+    await db.collection('users').doc(cred.user.uid).set({
+      name, email, role: 'user',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
   } catch (err) {
     showAuthError(friendlyAuthError(err));
   }

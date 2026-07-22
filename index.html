@@ -34,7 +34,20 @@
       <button type="submit" class="btn btn-primary btn-block">Sign in</button>
     </form>
 
-    <p class="contact-admin">Don't have an account? Contact your administrator.</p>
+    <form id="signupForm" class="auth-form hidden">
+      <label>Your name
+        <input type="text" id="signupName" required autocomplete="name" />
+      </label>
+      <label>Email <span class="optional">must be @urbanpower.dk</span>
+        <input type="email" id="signupEmail" required autocomplete="email" />
+      </label>
+      <label>Password <span class="optional">min. 6 characters</span>
+        <input type="password" id="signupPassword" required minlength="6" autocomplete="new-password" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Create account</button>
+    </form>
+
+    <button id="toggleAuthMode" class="link-btn" type="button">Need an account? Create one</button>
   </div>
 </section>
 
