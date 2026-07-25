@@ -301,8 +301,11 @@ function listenProjects() {
 // Highest project number first (e.g. P301 above P299). Falls back to name
 // when codes match or are missing, so uncoded projects still sort sensibly.
 function compareProjectsByCodeDesc(a, b) {
-  const codeCompare = naturalCompare(b.code || '', a.code || '');
-  if (codeCompare !== 0) return codeCompare;
+  const codeA = a.code || '';
+  const codeB = b.code || '';
+  if (codeA && codeB) return codeA.localeCompare(codeB);
+  if (codeA) return -1; // coded items first
+  if (codeB) return 1;
   return (a.name || '').localeCompare(b.name || '');
 }
 
