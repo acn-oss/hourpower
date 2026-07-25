@@ -37,6 +37,8 @@ let projectSortKey = 'code';
 let projectSortDir = 'asc';
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
+let userSortKey = 'code';
+let userSortDir = 'asc';
 
 // Generic extra-type system (ADM, AQ, INT — all stored in the projects collection with a type field)
 const EXTRA_TYPES = [
@@ -577,23 +579,31 @@ function renderProjectsTable() {
 
   // Render clickable headers with sort indicators
   const cols = [
-    { key: 'code',   label: 'No.'     },
-    { key: 'name',   label: 'Project' },
-    { key: 'client', label: 'Client'  }
+    { key: 'code',    label: 'No.'        },
+    { key: 'name',    label: 'Project'    },
+    { key: 'client',  label: 'Client'     },
+    { key: 'visible', label: 'Visible to' }
   ];
   thead.innerHTML = cols.map(({ key, label }) => {
     const active = projectSortKey === key;
     const arrow = active ? (projectSortDir === 'asc' ? ' ▲' : ' ▼') : '';
     return `<th class="sortable-th${active ? ' sort-active' : ''}" data-sort-key="${key}">${label}${arrow}</th>`;
-  }).join('') + '<th>Visible to</th><th></th>';
+  }).join('') + '<th></th>';
 
   const active = projectsCache.filter(p => p.active !== false);
 
-  // Sort by selected column
+  // Sort by selected column — 'visible' sorts by number of assigned users
   active.sort((a, b) => {
-    const valA = (a[projectSortKey] || '').toLowerCase();
-    const valB = (b[projectSortKey] || '').toLowerCase();
-    const cmp = valA.localeCompare(valB);
+    let cmp;
+    if (projectSortKey === 'visible') {
+      const nA = (a.assignedUserIds || []).length;
+      const nB = (b.assignedUserIds || []).length;
+      cmp = nA - nB;
+    } else {
+      const valA = (a[projectSortKey] || '').toLowerCase();
+      const valB = (b[projectSortKey] || '').toLowerCase();
+      cmp = valA.localeCompare(valB);
+    }
     return projectSortDir === 'asc' ? cmp : -cmp;
   });
 
@@ -997,6 +1007,19 @@ $('weekPrevBtn').addEventListener('click', () => { weekStart = addDays(weekStart
 $('weekNextBtn').addEventListener('click', () => { weekStart = addDays(weekStart, 7); renderWeekGrid(); });
 $('weekTodayBtn').addEventListener('click', () => { weekStart = getMonday(new Date()); renderWeekGrid(); });
 
+$('weekGridTable').addEventListener('click', (e) => {
+  const th = e.target.closest('[data-user-sort]');
+  if (!th) return;
+  const key = th.dataset.userSort;
+  if (userSortKey === key) {
+    userSortDir = userSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    userSortKey = key;
+    userSortDir = 'asc';
+  }
+  renderWeekGrid();
+});
+
 function listenUserEntries() {
   userEntriesUnsub = db.collection('entries')
     .where('userId', '==', currentUser.uid)
@@ -1015,21 +1038,31 @@ function renderWeekGrid() {
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const dateStrs = weekDates.map(toISODate);
 
-  $('weekGridHeadRow').innerHTML = '<th>Project / ADM</th>' +
+  const sortArrow = (key) => userSortKey === key ? (userSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+  $('weekGridHeadRow').innerHTML =
+    `<th class="sortable-th${userSortKey==='code'?' sort-active':''}" data-user-sort="code">No.${sortArrow('code')}</th>` +
+    `<th class="sortable-th${userSortKey==='name'?' sort-active':''}" data-user-sort="name">Project${sortArrow('name')}</th>` +
     weekDates.map((d, i) => `<th class="num ${i >= 5 ? 'weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth() + 1}</span></th>`).join('') +
     '<th class="num">Total</th>';
 
-  const visibleProjects = projectsCache.filter(p => p.active !== false && isProjectVisibleToCurrentUser(p));
+  const sortItems = (items) => [...items].sort((a, b) => {
+    const va = (a[userSortKey] || '').toLowerCase();
+    const vb = (b[userSortKey] || '').toLowerCase();
+    const cmp = va.localeCompare(vb);
+    return userSortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const visibleProjects = sortItems(projectsCache.filter(p => p.active !== false && isProjectVisibleToCurrentUser(p)));
   const visibleExtras = EXTRA_TYPES.map(({ type, label }) => ({
     label,
-    items: (extraCache[type] || []).filter(p => p.active !== false && isProjectVisibleToCurrentUser(p))
+    items: sortItems((extraCache[type] || []).filter(p => p.active !== false && isProjectVisibleToCurrentUser(p)))
   }));
   const hasItems = visibleProjects.length > 0 || visibleExtras.some(g => g.items.length > 0);
   $('noProjectsState').classList.toggle('hidden', hasItems);
   $('weekGridTable').classList.toggle('hidden', !hasItems);
 
   const entryFor = (projectId, date) => userEntriesCache.find(en => en.projectId === projectId && en.date === date);
-  const colspan = 9;
+  const colspan = 10; // No. + Project + 7 days + Total
 
   const renderSection = (items, label) => {
     if (!items.length) return '';
@@ -1043,7 +1076,12 @@ function renderWeekGrid() {
         return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
           data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
       }).join('');
-      return `<tr><td>${projectLabelHtml(p)}</td>${cells}<td class="num row-total">${trimZeros(rowTotal)}</td></tr>`;
+      return `<tr>
+        <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
+        <td>${escapeHtml(p.name)}</td>
+        ${cells}
+        <td class="num row-total">${trimZeros(rowTotal)}</td>
+      </tr>`;
     }).join('');
     return header + rows;
   };
