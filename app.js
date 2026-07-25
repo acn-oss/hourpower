@@ -1276,6 +1276,7 @@ function renderAllEntries() {
       <td>${escapeHtml(p ? (p.client || '') : '')}</td>
       <td class="num">${en.hours}</td>
       <td class="note-cell">${escapeHtml(en.note || '')}</td>
+      <td class="row-actions"><button class="link-btn" data-edit-entry="${en.id}">Edit</button></td>
     </tr>
   `;
   }).join('');
@@ -1283,6 +1284,78 @@ function renderAllEntries() {
   const total = filteredRows.reduce((s, en) => s + en.hours, 0);
   $('allEntriesTotal').textContent = trimZeros(total);
 }
+
+// ============================================================
+// Editor: inline entry editing
+// ============================================================
+function populateEditProjectSelect(currentProjectId) {
+  const sel = $('editEntryProject');
+  sel.innerHTML = '';
+  const addGroup = (label, items) => {
+    if (!items.length) return;
+    const grp = document.createElement('optgroup');
+    grp.label = label;
+    items.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = projectLabelText(p);
+      if (p.id === currentProjectId) opt.selected = true;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  };
+  EXTRA_TYPES.forEach(({ type, label }) => addGroup(label, extraCache[type] || []));
+  addGroup('Projects', projectsCache);
+}
+
+function openEntryEditPanel(entryId) {
+  const en = allEntriesCache.find(e => e.id === entryId);
+  if (!en) return;
+  $('editEntryId').value = en.id;
+  $('editEntryPerson').textContent = en.userName;
+  $('editEntryDate').value = en.date;
+  $('editEntryHours').value = en.hours;
+  $('editEntryNote').value = en.note || '';
+  populateEditProjectSelect(en.projectId);
+  $('entryEditPanel').classList.remove('hidden');
+  $('editEntryDate').focus();
+  $('entryEditPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeEntryEditPanel() {
+  $('entryEditPanel').classList.add('hidden');
+  $('editEntryId').value = '';
+}
+
+$('allEntriesTable').addEventListener('click', (e) => {
+  const id = e.target.dataset.editEntry;
+  if (id) openEntryEditPanel(id);
+});
+
+$('cancelEntryEditBtn').addEventListener('click', closeEntryEditPanel);
+$('cancelEntryEditBtn2').addEventListener('click', closeEntryEditPanel);
+
+$('entryEditForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = $('editEntryId').value;
+  const projectId = $('editEntryProject').value;
+  const project = projectById(projectId) ||
+    EXTRA_TYPES.flatMap(({ type }) => extraCache[type]).find(p => p.id === projectId);
+  const date = $('editEntryDate').value;
+  const hours = parseFloat($('editEntryHours').value);
+  const note = $('editEntryNote').value.trim();
+  if (!id || !projectId || !date || !hours || hours <= 0) return;
+
+  await db.collection('entries').doc(id).update({
+    projectId,
+    projectName: project ? project.name : '',
+    date,
+    hours,
+    note
+  });
+  closeEntryEditPanel();
+  showStamp('Updated');
+});
 
 $('exportCsvBtn').addEventListener('click', () => {
   const header = ['Date', 'Person', 'Project', 'Project number', 'Client', 'Hours', 'Note'];
