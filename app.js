@@ -330,6 +330,7 @@ function listenAllUsers() {
   allUsersUnsub = db.collection('users').orderBy('name').onSnapshot((snap) => {
     allUsersCache = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.role !== 'editor');
     renderProjectsTable();
+    renderAdmTable();
     renderRatesTable();
     renderWeekOverview();
   });
