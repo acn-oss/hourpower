@@ -1064,6 +1064,21 @@ function renderFilterUserSelect() {
   $(id).addEventListener('change', renderAllEntries);
 });
 
+function makeToggle(toggleId, bodyId, chevronId) {
+  const el = $(toggleId);
+  if (!el) return;
+  const handler = () => {
+    const expanded = el.getAttribute('aria-expanded') === 'true';
+    el.setAttribute('aria-expanded', String(!expanded));
+    $(bodyId).classList.toggle('hidden', expanded);
+    $(chevronId).classList.toggle('collapsed', expanded);
+  };
+  el.addEventListener('click', handler);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+  });
+}
+
 makeToggle('allEntriesToggle', 'allEntriesBody', 'allEntriesChevron');
 makeToggle('weekOverviewToggle', 'weekOverviewBody', 'weekOverviewChevron');
 makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
