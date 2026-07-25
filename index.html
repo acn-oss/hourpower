@@ -181,64 +181,68 @@
       <div id="extraTypesContainer"></div>
 
       <div class="card">
-        <div class="card-header-row">
-          <h2>Weekly overview</h2>
-          <div class="week-nav">
+        <button type="button" class="card-header-row card-toggle" id="weekOverviewToggle" aria-expanded="false">
+          <h2>Weekly overview <span class="chevron collapsed" id="weekOverviewChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
             <button id="editorWeekPrevBtn" class="btn btn-ghost" type="button">‹</button>
             <span id="editorWeekLabel" class="week-label"></span>
             <button id="editorWeekNextBtn" class="btn btn-ghost" type="button">›</button>
             <button id="editorWeekTodayBtn" class="btn btn-ghost" type="button">This week</button>
           </div>
-        </div>
-        <div class="table-wrap">
-          <table class="ledger-table" id="weekOverviewTable">
-            <thead><tr><th>Employee</th><th class="num">Hours logged</th><th>Status</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <p id="weekOverviewEmpty" class="empty-state hidden">No employee accounts yet.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-header-row">
-          <h2>Project totals</h2>
-        </div>
-        <div class="filters">
-          <label>Project
-            <select id="totalsProjectSelect"><option value="">Choose a project…</option></select>
-          </label>
-        </div>
-        <p id="totalsHint" class="empty-state">Choose a project above to see cost and sales totals per employee.</p>
-        <p id="totalsEmptyState" class="empty-state hidden">No hours logged to this project yet.</p>
-
-        <div id="projectSummary" class="summary-grid hidden">
-          <div class="summary-item"><span class="summary-label">Expected fee</span><span class="summary-value" id="sumExpectedFee">–</span></div>
-          <div class="summary-item"><span class="summary-label">Subadvisors</span><span class="summary-value" id="sumSubadvisors">–</span></div>
-          <div class="summary-item"><span class="summary-label">Net fee</span><span class="summary-value" id="sumNetFee">–</span></div>
-          <div class="summary-item"><span class="summary-label">Cost price</span><span class="summary-value" id="sumCostPrice">–</span></div>
-          <div class="summary-item"><span class="summary-label">Margin</span><span class="summary-value" id="sumMargin">–</span></div>
-          <div class="summary-item"><span class="summary-label">Factor</span><span class="summary-value" id="sumFactor">–</span></div>
-        </div>
-
-        <div class="table-wrap">
-          <table class="ledger-table hidden" id="projectTotalsTable">
-            <thead><tr><th>Employee</th><th class="num">Hours</th><th class="num">Sales price</th><th class="num">Cost price</th><th class="num">Margin</th></tr></thead>
-            <tbody></tbody>
-            <tfoot></tfoot>
-          </table>
+        </button>
+        <div id="weekOverviewBody" class="collapsible-body hidden">
+          <div class="table-wrap">
+            <table class="ledger-table" id="weekOverviewTable">
+              <thead><tr><th>Employee</th><th class="num">Hours logged</th><th>Status</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="weekOverviewEmpty" class="empty-state hidden">No employee accounts yet.</p>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header-row">
-          <h2>Employee standard rates</h2>
+        <button type="button" class="card-header-row card-toggle" id="projectTotalsToggle" aria-expanded="false">
+          <h2>Project totals <span class="chevron collapsed" id="projectTotalsChevron">▾</span></h2>
+        </button>
+        <div id="projectTotalsBody" class="collapsible-body hidden">
+          <div class="filters">
+            <label>Project
+              <select id="totalsProjectSelect"><option value="">Choose a project…</option></select>
+            </label>
+          </div>
+          <p id="totalsHint" class="empty-state">Choose a project above to see cost and sales totals per employee.</p>
+          <p id="totalsEmptyState" class="empty-state hidden">No hours logged to this project yet.</p>
+          <div id="projectSummary" class="summary-grid hidden">
+            <div class="summary-item"><span class="summary-label">Expected fee</span><span class="summary-value" id="sumExpectedFee">–</span></div>
+            <div class="summary-item"><span class="summary-label">Subadvisors</span><span class="summary-value" id="sumSubadvisors">–</span></div>
+            <div class="summary-item"><span class="summary-label">Net fee</span><span class="summary-value" id="sumNetFee">–</span></div>
+            <div class="summary-item"><span class="summary-label">Cost price</span><span class="summary-value" id="sumCostPrice">–</span></div>
+            <div class="summary-item"><span class="summary-label">Margin</span><span class="summary-value" id="sumMargin">–</span></div>
+            <div class="summary-item"><span class="summary-label">Factor</span><span class="summary-value" id="sumFactor">–</span></div>
+          </div>
+          <div class="table-wrap">
+            <table class="ledger-table hidden" id="projectTotalsTable">
+              <thead><tr><th>Employee</th><th class="num">Hours</th><th class="num">Sales price</th><th class="num">Cost price</th><th class="num">Margin</th></tr></thead>
+              <tbody></tbody>
+              <tfoot></tfoot>
+            </table>
+          </div>
         </div>
-        <p class="access-intro">Sales rate and cost rate are only visible to you here — employees never see these numbers, even their own.</p>
-        <div class="table-wrap">
-          <table class="ledger-table" id="ratesTable">
-            <thead><tr><th>Employee</th><th class="num">Sales rate (DKK/h)</th><th class="num">Cost rate (DKK/h)</th></tr></thead>
-            <tbody></tbody>
-          </table>
+      </div>
+
+      <div class="card">
+        <button type="button" class="card-header-row card-toggle" id="ratesToggle" aria-expanded="false">
+          <h2>Employee standard rates <span class="chevron collapsed" id="ratesChevron">▾</span></h2>
+        </button>
+        <div id="ratesBody" class="collapsible-body hidden">
+          <p class="access-intro">Sales rate and cost rate are only visible to you here — employees never see these numbers, even their own.</p>
+          <div class="table-wrap">
+            <table class="ledger-table" id="ratesTable">
+              <thead><tr><th>Employee</th><th class="num">Sales rate (DKK/h)</th><th class="num">Cost rate (DKK/h)</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </div>
 

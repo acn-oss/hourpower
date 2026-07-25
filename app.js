@@ -736,47 +736,67 @@ $('cancelAccessBtn').addEventListener('click', () => $('accessPanel').classList.
 function initExtraTypeCards() {
   $('extraTypesContainer').innerHTML = EXTRA_TYPES.map(({ type, label }) => `
     <div class="card">
-      <div class="card-header-row">
-        <h2>${label}</h2>
-        <button type="button" class="btn btn-primary" id="newBtn-${type}">+ New ${label}</button>
-      </div>
-      <form id="form-${type}" class="stacked-form hidden">
-        <input type="hidden" id="formId-${type}" />
-        <label>Name
-          <input type="text" id="formName-${type}" required />
-        </label>
-        <div class="field-row">
-          <label>Code <span class="optional">optional, e.g. AB12</span>
-            <input type="text" id="formCode-${type}" maxlength="4" placeholder="AB12" />
+      <button type="button" class="card-header-row card-toggle" id="toggle-${type}" aria-expanded="false">
+        <h2>${label} <span class="chevron collapsed" id="chevron-${type}">▾</span></h2>
+      </button>
+      <div id="body-${type}" class="collapsible-body hidden">
+        <form id="form-${type}" class="stacked-form hidden">
+          <input type="hidden" id="formId-${type}" />
+          <label>Name
+            <input type="text" id="formName-${type}" required />
           </label>
-          <label>Description <span class="optional">optional</span>
-            <input type="text" id="formDesc-${type}" />
-          </label>
+          <div class="field-row">
+            <label>Code <span class="optional">optional, e.g. AB12</span>
+              <input type="text" id="formCode-${type}" maxlength="4" placeholder="AB12" />
+            </label>
+            <label>Description <span class="optional">optional</span>
+              <input type="text" id="formDesc-${type}" />
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save ${label}</button>
+            <button type="button" class="btn btn-ghost extra-cancel" data-type="${type}">Cancel</button>
+          </div>
+        </form>
+        <div id="access-${type}" class="stacked-form hidden">
+          <p class="access-intro">Who can log hours to <strong id="accessName-${type}"></strong>? Leave everyone unchecked to keep it open to your whole team.</p>
+          <div id="accessList-${type}" class="checkbox-list"></div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary extra-save-access" data-type="${type}">Save access</button>
+            <button type="button" class="btn btn-ghost extra-cancel-access" data-type="${type}">Cancel</button>
+          </div>
         </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Save ${label}</button>
-          <button type="button" class="btn btn-ghost extra-cancel" data-type="${type}">Cancel</button>
+        <div class="card-header-row" style="margin-top:4px">
+          <span></span>
+          <button type="button" class="btn btn-primary" id="newBtn-${type}">+ New ${label}</button>
         </div>
-      </form>
-      <div id="access-${type}" class="stacked-form hidden">
-        <p class="access-intro">Who can log hours to <strong id="accessName-${type}"></strong>? Leave everyone unchecked to keep it open to your whole team.</p>
-        <div id="accessList-${type}" class="checkbox-list"></div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-primary extra-save-access" data-type="${type}">Save access</button>
-          <button type="button" class="btn btn-ghost extra-cancel-access" data-type="${type}">Cancel</button>
+        <div class="table-wrap">
+          <table class="ledger-table" id="table-${type}">
+            <thead><tr><th>No.</th><th>Name</th><th>Status</th><th>Visible to</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
         </div>
-      </div>
-      <div class="table-wrap">
-        <table class="ledger-table" id="table-${type}">
-          <thead><tr><th>No.</th><th>Name</th><th>Status</th><th>Visible to</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
       </div>
     </div>
   `).join('');
 
   EXTRA_TYPES.forEach(({ type, label }) => {
+    // Collapse/expand toggle
+    document.getElementById(`toggle-${type}`).addEventListener('click', () => {
+      const btn = document.getElementById(`toggle-${type}`);
+      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!expanded));
+      document.getElementById(`body-${type}`).classList.toggle('hidden', expanded);
+      document.getElementById(`chevron-${type}`).classList.toggle('collapsed', expanded);
+    });
+
+    // New button
     document.getElementById(`newBtn-${type}`).addEventListener('click', () => {
+      // Auto-expand if collapsed
+      const btn = document.getElementById(`toggle-${type}`);
+      btn.setAttribute('aria-expanded', 'true');
+      document.getElementById(`body-${type}`).classList.remove('hidden');
+      document.getElementById(`chevron-${type}`).classList.remove('collapsed');
       currentExtraEdit = { type, id: null };
       document.getElementById(`formId-${type}`).value = '';
       document.getElementById(`formName-${type}`).value = '';
@@ -1048,6 +1068,18 @@ $('allEntriesToggle').addEventListener('click', () => {
   $('allEntriesBody').classList.toggle('hidden', expanded);
   $('allEntriesChevron').classList.toggle('collapsed', expanded);
 });
+
+function makeToggle(toggleId, bodyId, chevronId) {
+  $(toggleId).addEventListener('click', () => {
+    const expanded = $(toggleId).getAttribute('aria-expanded') === 'true';
+    $(toggleId).setAttribute('aria-expanded', String(!expanded));
+    $(bodyId).classList.toggle('hidden', expanded);
+    $(chevronId).classList.toggle('collapsed', expanded);
+  });
+}
+makeToggle('weekOverviewToggle', 'weekOverviewBody', 'weekOverviewChevron');
+makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
+makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
 
 function projectById(id) {
   return projectsCache.find(p => p.id === id);
