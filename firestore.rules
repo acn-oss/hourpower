@@ -19,15 +19,15 @@ service cloud.firestore {
     function isEditor() {
       return isSignedIn() &&
         request.auth.token.email in [
-          'info@urbanpower.dk'
+          'you@example.com'
         ];
     }
 
     // Each user's own profile doc (name, email, role)
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && request.auth.uid == userId;
-      allow delete: if false;
+      allow create, update: if isSignedIn() && (request.auth.uid == userId || isEditor());
+      allow delete: if isEditor();
     }
 
     // Projects: anyone signed in can see them, only editors can change them

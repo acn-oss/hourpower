@@ -254,10 +254,26 @@
           <p class="access-intro">Sales rate and cost rate are only visible to you here — employees never see these numbers, even their own.</p>
           <div class="table-wrap">
             <table class="ledger-table" id="ratesTable">
-              <thead><tr><th>Employee</th><th class="num">Sales rate (DKK/h)</th><th class="num">Cost rate (DKK/h)</th></tr></thead>
+              <thead><tr><th>Employee</th><th class="num">Sales rate (DKK/h)</th><th class="num">Cost rate (DKK/h)</th><th></th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="archivedUsersToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Archived users <span class="chevron collapsed" id="archivedUsersChevron">▾</span></h2>
+        </div>
+        <div id="archivedUsersBody" class="collapsible-body hidden">
+          <p class="access-intro">Archived users can no longer log in. Deleting removes them from Firestore — to fully remove their login account, also delete them from Firebase Console → Security → Authentication.</p>
+          <div class="table-wrap">
+            <table class="ledger-table" id="archivedUsersTable">
+              <thead><tr><th>Employee</th><th>Email</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="archivedUsersEmpty" class="empty-state hidden">No archived users.</p>
         </div>
       </div>
 

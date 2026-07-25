@@ -25,6 +25,7 @@ let projectsCache = [];
 let userEntriesCache = [];
 let allEntriesCache = [];
 let allUsersCache = [];
+let archivedUsersCache = [];
 let ratesCache = {};
 let filteredRows = [];
 let userEntriesUnsub = null;
@@ -346,10 +347,13 @@ function projectLabelText(p) {
 
 function listenAllUsers() {
   allUsersUnsub = db.collection('users').orderBy('name').onSnapshot((snap) => {
-    allUsersCache = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.role !== 'editor');
+    const all = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.role !== 'editor');
+    allUsersCache = all.filter(u => u.active !== false);
+    archivedUsersCache = all.filter(u => u.active === false);
     renderProjectsTable();
     EXTRA_TYPES.forEach(({ type }) => renderExtraTable(type));
     renderRatesTable();
+    renderArchivedUsersTable();
     renderWeekOverview();
   });
 }
@@ -413,7 +417,7 @@ function listenRates() {
 function renderRatesTable() {
   const tbody = $('ratesTable').querySelector('tbody');
   if (!allUsersCache.length) {
-    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">No one has signed up yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No active employees yet.</td></tr>`;
     return;
   }
   tbody.innerHTML = allUsersCache.map(u => {
@@ -425,8 +429,26 @@ function renderRatesTable() {
         data-rate-uid="${u.uid}" data-rate-field="salesRate" value="${r.salesRate ?? ''}" /></td>
       <td class="num"><input type="number" min="0" step="1" class="rate-input"
         data-rate-uid="${u.uid}" data-rate-field="costRate" value="${r.costRate ?? ''}" /></td>
+      <td class="row-actions">
+        <button class="link-btn" data-archive-user="${u.uid}">Archive</button>
+      </td>
     </tr>`;
   }).join('');
+}
+
+function renderArchivedUsersTable() {
+  const tbody = $('archivedUsersTable').querySelector('tbody');
+  $('archivedUsersEmpty').classList.toggle('hidden', archivedUsersCache.length > 0);
+  $('archivedUsersTable').classList.toggle('hidden', archivedUsersCache.length === 0);
+  tbody.innerHTML = archivedUsersCache.map(u => `
+    <tr>
+      <td>${escapeHtml(u.name)}</td>
+      <td>${escapeHtml(u.email || '')}</td>
+      <td class="row-actions">
+        <button class="link-btn" data-unarchive-user="${u.uid}">Unarchive</button>
+        <button class="link-btn link-danger" data-delete-user="${u.uid}">Delete</button>
+      </td>
+    </tr>`).join('');
 }
 
 $('ratesTable').addEventListener('change', async (e) => {
@@ -1196,6 +1218,32 @@ makeToggle('allEntriesToggle', 'allEntriesBody', 'allEntriesChevron');
 makeToggle('weekOverviewToggle', 'weekOverviewBody', 'weekOverviewChevron');
 makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
 makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
+makeToggle('archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron');
+
+$('ratesTable').addEventListener('click', async (e) => {
+  const uid = e.target.dataset.archiveUser;
+  if (!uid) return;
+  const u = allUsersCache.find(x => x.uid === uid);
+  if (confirm(`Archive ${u ? u.name : 'this user'}?\n\nThey will no longer appear in the app, but their logged hours are kept. You can unarchive them later.`)) {
+    await db.collection('users').doc(uid).update({ active: false });
+  }
+});
+
+$('archivedUsersTable').addEventListener('click', async (e) => {
+  const unarchiveUid = e.target.dataset.unarchiveUser;
+  const deleteUid = e.target.dataset.deleteUser;
+
+  if (unarchiveUid) {
+    await db.collection('users').doc(unarchiveUid).update({ active: true });
+  }
+  if (deleteUid) {
+    const u = archivedUsersCache.find(x => x.uid === deleteUid);
+    const name = u ? `"${u.name}"` : 'this user';
+    if (confirm(`Permanently delete ${name} from Firestore?\n\nThis removes them from all lists in Hour Power. Their logged hours remain in All entries.\n\nTo fully remove their login, also delete them from Firebase Console → Security → Authentication.`)) {
+      await db.collection('users').doc(deleteUid).delete();
+    }
+  }
+});
 
 function projectById(id) {
   return projectsCache.find(p => p.id === id);
