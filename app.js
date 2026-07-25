@@ -665,14 +665,13 @@ $('cancelProjectBtn').addEventListener('click', () => {
 $('projectForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('projectName').value.trim();
-  const code = $('projectCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7);
+  const code = $('projectCode').value.trim().slice(0, 10);
   const client = $('projectClient').value.trim();
   const description = $('projectDesc').value.trim();
   const expectedFee = parseNonNegative($('projectExpectedFee').value);
   const subadvisors = parseNonNegative($('projectSubadvisors').value);
   const rateLines = readRateLineInputs();
   if (!name) return;
-  $('projectCode').value = code;
 
   if (editingProjectId) {
     await db.collection('projects').doc(editingProjectId)
