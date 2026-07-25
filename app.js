@@ -1344,7 +1344,16 @@ $('entryEditForm').addEventListener('submit', async (e) => {
   const date = $('editEntryDate').value;
   const hours = parseFloat($('editEntryHours').value);
   const note = $('editEntryNote').value.trim();
-  if (!id || !projectId || !date || !hours || hours <= 0) return;
+  if (!id || !projectId || !date || isNaN(hours) || hours < 0) return;
+
+  if (hours === 0) {
+    if (confirm('Setting hours to 0 will delete this entry. Continue?')) {
+      await db.collection('entries').doc(id).delete();
+      closeEntryEditPanel();
+      showStamp('Deleted');
+    }
+    return;
+  }
 
   await db.collection('entries').doc(id).update({
     projectId,
