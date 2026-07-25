@@ -1396,6 +1396,150 @@ $('entryEditForm').addEventListener('submit', async (e) => {
   showStamp('Updated');
 });
 
+// ============================================================
+// PDF export — formal report with logo, header, table, totals
+// ============================================================
+async function loadLogoBase64() {
+  try {
+    const res = await fetch('logo.png');
+    const blob = await res.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
+$('exportPdfBtn').addEventListener('click', async () => {
+  if (!filteredRows.length) { alert('No entries to export — adjust your filters first.'); return; }
+
+  const btn = $('exportPdfBtn');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();   // 297mm
+    const H = doc.internal.pageSize.getHeight();  // 210mm
+    const M = 14;  // margin
+    const INK  = [28, 42, 46];
+    const WHITE = [255, 255, 255];
+    const TEAL  = [47, 93, 90];
+    const SOFT  = [220, 230, 224];
+    const ALT   = [242, 245, 240];
+
+    // ---- Header bar ----
+    const HEADER_H = 24;
+    doc.setFillColor(...INK);
+    doc.rect(0, 0, W, HEADER_H, 'F');
+
+    // Logo
+    const logoData = await loadLogoBase64();
+    if (logoData) {
+      doc.addImage(logoData, 'PNG', M, 3, 18, 18);
+    }
+
+    // Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...WHITE);
+    doc.text('Hour Power — Time Registration Report', M + (logoData ? 22 : 0), 12);
+
+    // Sub-line: Urban Power Architecture + Urbanism
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 200, 196);
+    doc.text('Urban Power Architecture + Urbanism', M + (logoData ? 22 : 0), 19);
+
+    // Generated date (top right)
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(7.5);
+    doc.text(`Generated: ${new Date().toLocaleDateString('da-DK')}`, W - M, 12, { align: 'right' });
+
+    // ---- Subtitle: active filters ----
+    const filters = [];
+    const fpVal = $('filterProject').value;
+    if (fpVal) {
+      const fp = projectById(fpVal) ||
+        EXTRA_TYPES.flatMap(({ type }) => extraCache[type]).find(p => p.id === fpVal);
+      if (fp) filters.push(`Project: ${projectLabelText(fp)}`);
+    }
+    const fuVal = $('filterUser').value;
+    if (fuVal) {
+      const fu = allUsersCache.find(u => u.uid === fuVal);
+      if (fu) filters.push(`Person: ${fu.name}`);
+    }
+    if ($('filterFrom').value) filters.push(`From: ${formatDate($('filterFrom').value)}`);
+    if ($('filterTo').value) filters.push(`To: ${formatDate($('filterTo').value)}`);
+
+    doc.setTextColor(...INK);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.text(
+      filters.length ? filters.join('  ·  ') : 'All entries — no filters applied',
+      M, HEADER_H + 8
+    );
+
+    // ---- Table ----
+    const totalHours = trimZeros(filteredRows.reduce((s, en) => s + en.hours, 0));
+
+    doc.autoTable({
+      startY: HEADER_H + 13,
+      margin: { left: M, right: M },
+      head: [['Date', 'Person', 'Project', 'Client', 'Hours', 'Note']],
+      body: filteredRows.map(en => {
+        const p = projectById(en.projectId) ||
+          EXTRA_TYPES.flatMap(({ type }) => extraCache[type]).find(x => x.id === en.projectId);
+        const label = (p && p.code ? `${p.code}  ` : '') + en.projectName;
+        return [
+          formatDate(en.date),
+          en.userName,
+          label,
+          p ? (p.client || '') : '',
+          trimZeros(en.hours),
+          en.note || ''
+        ];
+      }),
+      foot: [['', '', '', 'Total', totalHours, '']],
+      headStyles: {
+        fillColor: INK, textColor: WHITE,
+        fontSize: 7.5, fontStyle: 'bold', cellPadding: 3
+      },
+      footStyles: {
+        fillColor: SOFT, textColor: INK,
+        fontSize: 7.5, fontStyle: 'bold', cellPadding: 3
+      },
+      bodyStyles: { fontSize: 7.5, textColor: INK, cellPadding: 2.5 },
+      alternateRowStyles: { fillColor: ALT },
+      columnStyles: {
+        0: { cellWidth: 22 },
+        1: { cellWidth: 36 },
+        2: { cellWidth: 60 },
+        3: { cellWidth: 36 },
+        4: { cellWidth: 16, halign: 'right', font: 'courier' },
+        5: { cellWidth: 'auto' }
+      },
+      didDrawPage: ({ pageNumber }) => {
+        const total = doc.internal.getNumberOfPages();
+        doc.setFontSize(6.5);
+        doc.setTextColor(160, 160, 160);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Urban Power Architecture + Urbanism', M, H - 5);
+        doc.text(`Page ${pageNumber} of ${total}`, W - M, H - 5, { align: 'right' });
+      }
+    });
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    doc.save(`hourpower-report-${dateStr}.pdf`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Export PDF';
+  }
+});
+
 $('exportCsvBtn').addEventListener('click', () => {
   const header = ['Date', 'Person', 'Project', 'Project number', 'Client', 'Hours', 'Note'];
   const lines = [header.join(',')].concat(filteredRows.map(en => {
