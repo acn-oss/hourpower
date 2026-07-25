@@ -431,6 +431,7 @@ function renderRatesTable() {
         data-rate-uid="${u.uid}" data-rate-field="costRate" value="${r.costRate ?? ''}" /></td>
       <td class="row-actions">
         <button class="link-btn" data-archive-user="${u.uid}">Archive</button>
+        <button class="link-btn link-danger" data-delete-user-active="${u.uid}">Delete</button>
       </td>
     </tr>`;
   }).join('');
@@ -1221,11 +1222,40 @@ makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
 makeToggle('archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron');
 
 $('ratesTable').addEventListener('click', async (e) => {
-  const uid = e.target.dataset.archiveUser;
-  if (!uid) return;
+  const archiveUid = e.target.dataset.archiveUser;
+  const deleteUid = e.target.dataset.deleteUserActive;
+  if (!archiveUid && !deleteUid) return;
+
+  const uid = archiveUid || deleteUid;
   const u = allUsersCache.find(x => x.uid === uid);
-  if (confirm(`Archive ${u ? u.name : 'this user'}?\n\nThey will no longer appear in the app, but their logged hours are kept. You can unarchive them later.`)) {
-    await db.collection('users').doc(uid).update({ active: false });
+  const name = u ? u.name : 'this user';
+
+  if (archiveUid) {
+    if (!confirm(`Archive ${name}?\n\nThey will no longer appear in the app, but their logged hours are kept. You can unarchive them later.`)) return;
+    try {
+      await db.collection('users').doc(uid).update({ active: false });
+    } catch (err) {
+      alert(
+        `Couldn't archive ${name}.\n\n` +
+        (err.code === 'permission-denied'
+          ? 'Firestore rules need updating — repaste firestore.rules into Firebase Console → Databases & Storage → Firestore → Rules → Publish, then try again.'
+          : err.message)
+      );
+    }
+  }
+
+  if (deleteUid) {
+    if (!confirm(`Permanently delete ${name} from Firestore?\n\nThis removes them from all lists. Their logged hours remain in All entries.\n\nTo fully remove their login, also delete them from Firebase Console → Security → Authentication.`)) return;
+    try {
+      await db.collection('users').doc(uid).delete();
+    } catch (err) {
+      alert(
+        `Couldn't delete ${name}.\n\n` +
+        (err.code === 'permission-denied'
+          ? 'Firestore rules need updating — repaste firestore.rules into Firebase Console → Databases & Storage → Firestore → Rules → Publish, then try again.'
+          : err.message)
+      );
+    }
   }
 });
 
