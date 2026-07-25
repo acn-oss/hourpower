@@ -34,11 +34,11 @@ let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
 let projectSortKey = 'code';
-let projectSortDir = 'asc';
+let projectSortDir = 'desc';
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
 let userSortKey = 'code';
-let userSortDir = 'asc';
+let userSortDir = 'desc';
 
 // Generic extra-type system (ADM, AQ, INT — all stored in the projects collection with a type field)
 const EXTRA_TYPES = [
