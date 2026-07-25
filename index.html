@@ -181,15 +181,15 @@
       <div id="extraTypesContainer"></div>
 
       <div class="card">
-        <button type="button" class="card-header-row card-toggle" id="weekOverviewToggle" aria-expanded="false">
+        <div class="card-header-row card-toggle" id="weekOverviewToggle" role="button" tabindex="0" aria-expanded="false">
           <h2>Weekly overview <span class="chevron collapsed" id="weekOverviewChevron">▾</span></h2>
-          <div class="week-nav" onclick="event.stopPropagation()">
-            <button id="editorWeekPrevBtn" class="btn btn-ghost" type="button">‹</button>
+          <div class="week-nav">
+            <button id="editorWeekPrevBtn" class="btn btn-ghost" type="button" onclick="event.stopPropagation()">‹</button>
             <span id="editorWeekLabel" class="week-label"></span>
-            <button id="editorWeekNextBtn" class="btn btn-ghost" type="button">›</button>
-            <button id="editorWeekTodayBtn" class="btn btn-ghost" type="button">This week</button>
+            <button id="editorWeekNextBtn" class="btn btn-ghost" type="button" onclick="event.stopPropagation()">›</button>
+            <button id="editorWeekTodayBtn" class="btn btn-ghost" type="button" onclick="event.stopPropagation()">This week</button>
           </div>
-        </button>
+        </div>
         <div id="weekOverviewBody" class="collapsible-body hidden">
           <div class="table-wrap">
             <table class="ledger-table" id="weekOverviewTable">
@@ -202,9 +202,9 @@
       </div>
 
       <div class="card">
-        <button type="button" class="card-header-row card-toggle" id="projectTotalsToggle" aria-expanded="false">
+        <div class="card-header-row card-toggle" id="projectTotalsToggle" role="button" tabindex="0" aria-expanded="false">
           <h2>Project totals <span class="chevron collapsed" id="projectTotalsChevron">▾</span></h2>
-        </button>
+        </div>
         <div id="projectTotalsBody" class="collapsible-body hidden">
           <div class="filters">
             <label>Project
@@ -232,9 +232,9 @@
       </div>
 
       <div class="card">
-        <button type="button" class="card-header-row card-toggle" id="ratesToggle" aria-expanded="false">
+        <div class="card-header-row card-toggle" id="ratesToggle" role="button" tabindex="0" aria-expanded="false">
           <h2>Employee standard rates <span class="chevron collapsed" id="ratesChevron">▾</span></h2>
-        </button>
+        </div>
         <div id="ratesBody" class="collapsible-body hidden">
           <p class="access-intro">Sales rate and cost rate are only visible to you here — employees never see these numbers, even their own.</p>
           <div class="table-wrap">
@@ -247,10 +247,10 @@
       </div>
 
       <div class="card">
-        <button type="button" class="card-header-row card-toggle" id="allEntriesToggle" aria-expanded="false">
+        <div class="card-header-row card-toggle" id="allEntriesToggle" role="button" tabindex="0" aria-expanded="false">
           <h2>All entries <span class="chevron collapsed" id="allEntriesChevron">▾</span></h2>
           <span class="total-pill">Total: <strong id="allEntriesTotal">0</strong>h</span>
-        </button>
+        </div>
 
         <div id="allEntriesBody" class="collapsible-body hidden">
           <div class="filters">

@@ -736,9 +736,9 @@ $('cancelAccessBtn').addEventListener('click', () => $('accessPanel').classList.
 function initExtraTypeCards() {
   $('extraTypesContainer').innerHTML = EXTRA_TYPES.map(({ type, label }) => `
     <div class="card">
-      <button type="button" class="card-header-row card-toggle" id="toggle-${type}" aria-expanded="false">
+      <div class="card-header-row card-toggle" id="toggle-${type}" role="button" tabindex="0" aria-expanded="false">
         <h2>${label} <span class="chevron collapsed" id="chevron-${type}">▾</span></h2>
-      </button>
+      </div>
       <div id="body-${type}" class="collapsible-body hidden">
         <form id="form-${type}" class="stacked-form hidden">
           <input type="hidden" id="formId-${type}" />
@@ -782,13 +782,15 @@ function initExtraTypeCards() {
 
   EXTRA_TYPES.forEach(({ type, label }) => {
     // Collapse/expand toggle
-    document.getElementById(`toggle-${type}`).addEventListener('click', () => {
-      const btn = document.getElementById(`toggle-${type}`);
-      const expanded = btn.getAttribute('aria-expanded') === 'true';
-      btn.setAttribute('aria-expanded', String(!expanded));
+    const toggleEl = document.getElementById(`toggle-${type}`);
+    const toggleHandler = () => {
+      const expanded = toggleEl.getAttribute('aria-expanded') === 'true';
+      toggleEl.setAttribute('aria-expanded', String(!expanded));
       document.getElementById(`body-${type}`).classList.toggle('hidden', expanded);
       document.getElementById(`chevron-${type}`).classList.toggle('collapsed', expanded);
-    });
+    };
+    toggleEl.addEventListener('click', toggleHandler);
+    toggleEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleHandler(); } });
 
     // New button
     document.getElementById(`newBtn-${type}`).addEventListener('click', () => {
@@ -1062,21 +1064,7 @@ function renderFilterUserSelect() {
   $(id).addEventListener('change', renderAllEntries);
 });
 
-$('allEntriesToggle').addEventListener('click', () => {
-  const expanded = $('allEntriesToggle').getAttribute('aria-expanded') === 'true';
-  $('allEntriesToggle').setAttribute('aria-expanded', String(!expanded));
-  $('allEntriesBody').classList.toggle('hidden', expanded);
-  $('allEntriesChevron').classList.toggle('collapsed', expanded);
-});
-
-function makeToggle(toggleId, bodyId, chevronId) {
-  $(toggleId).addEventListener('click', () => {
-    const expanded = $(toggleId).getAttribute('aria-expanded') === 'true';
-    $(toggleId).setAttribute('aria-expanded', String(!expanded));
-    $(bodyId).classList.toggle('hidden', expanded);
-    $(chevronId).classList.toggle('collapsed', expanded);
-  });
-}
+makeToggle('allEntriesToggle', 'allEntriesBody', 'allEntriesChevron');
 makeToggle('weekOverviewToggle', 'weekOverviewBody', 'weekOverviewChevron');
 makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
 makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
