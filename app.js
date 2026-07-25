@@ -24,8 +24,8 @@ let currentUser = null;      // { uid, name, email, role }
 let projectsCache = [];      // [{id, name, description, active, assignedUserIds}]
 let userEntriesCache = [];   // current user's entries (all dates)
 let allEntriesCache = [];
-let allUsersCache = [];      // editor only: everyone except editors, for the access panel & rates
-let ratesCache = {};         // editor only: { uid: {costRate, salesRate} }
+let allUsersCache = [];      // editor only
+let ratesCache = {};         // editor only
 let filteredRows = [];
 let userEntriesUnsub = null;
 let allEntriesUnsub = null;
@@ -33,6 +33,8 @@ let allUsersUnsub = null;
 let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
+let editingAdmId = null;
+let admAccessProjectId = null;
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
 
@@ -271,10 +273,13 @@ function cleanupListeners() {
 // ============================================================
 function listenProjects() {
   db.collection('projects').onSnapshot((snap) => {
-    projectsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    projectsCache.sort(compareProjectsByCodeDesc);
+    const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    all.sort(compareProjectsByCodeDesc);
+    projectsCache = all.filter(p => (p.type || 'project') === 'project');
+    admCache = all.filter(p => p.type === 'adm');
     if (currentUser.role === 'editor') {
       renderProjectsTable();
+      renderAdmTable();
       renderFilterProjectSelect();
     } else {
       renderWeekGrid();
@@ -527,15 +532,26 @@ function renderProjectTotals() {
 $('totalsProjectSelect').addEventListener('change', renderProjectTotals);
 
 function renderFilterProjectSelect() {
-  populateProjectSelect($('filterProject'), 'All projects');
-  populateProjectSelect($('totalsProjectSelect'), 'Choose a project…');
-}
+  // All entries filter — ADM and Projects grouped
+  const filterSel = $('filterProject');
+  const filterCurrent = filterSel.value;
+  filterSel.innerHTML = '<option value="">All projects & ADM</option>';
+  if (admCache.length) {
+    filterSel.innerHTML += `<optgroup label="ADM">${admCache.map(p =>
+      `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('')}</optgroup>`;
+  }
+  if (projectsCache.length) {
+    filterSel.innerHTML += `<optgroup label="Projects">${projectsCache.map(p =>
+      `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('')}</optgroup>`;
+  }
+  filterSel.value = filterCurrent;
 
-function populateProjectSelect(sel, placeholder) {
-  const current = sel.value;
-  sel.innerHTML = `<option value="">${placeholder}</option>` +
+  // Project totals — only real projects
+  const totalsSel = $('totalsProjectSelect');
+  const totalsCurrent = totalsSel.value;
+  totalsSel.innerHTML = '<option value="">Choose a project…</option>' +
     projectsCache.map(p => `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('');
-  sel.value = current;
+  totalsSel.value = totalsCurrent;
 }
 
 function renderProjectsTable() {
@@ -702,6 +718,111 @@ $('saveAccessBtn').addEventListener('click', async () => {
 $('cancelAccessBtn').addEventListener('click', () => $('accessPanel').classList.add('hidden'));
 
 // ============================================================
+// ADM table, form, and access panel
+// ============================================================
+function renderAdmTable() {
+  const tbody = $('admTable').querySelector('tbody');
+  if (!admCache.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No ADM items yet — create the first one above.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = admCache.map(p => {
+    const n = (p.assignedUserIds || []).length;
+    return `
+    <tr>
+      <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td><span class="stamp-badge ${p.active === false ? 'stamp-badge-off' : ''}">${p.active === false ? 'Archived' : 'Active'}</span></td>
+      <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
+      <td class="row-actions">
+        <button class="link-btn" data-edit-adm="${p.id}">Edit</button>
+        <button class="link-btn" data-access-adm="${p.id}">Access</button>
+        <button class="link-btn" data-toggle-adm="${p.id}">${p.active === false ? 'Unarchive' : 'Archive'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+$('newAdmBtn').addEventListener('click', () => {
+  editingAdmId = null;
+  $('admId').value = '';
+  $('admName').value = '';
+  $('admCode').value = '';
+  $('admDesc').value = '';
+  $('admAccessPanel').classList.add('hidden');
+  $('admForm').classList.remove('hidden');
+  $('admName').focus();
+});
+
+$('cancelAdmBtn').addEventListener('click', () => $('admForm').classList.add('hidden'));
+
+$('admForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('admName').value.trim();
+  const code = $('admCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  const description = $('admDesc').value.trim();
+  if (!name) return;
+  $('admCode').value = code;
+
+  if (editingAdmId) {
+    await db.collection('projects').doc(editingAdmId).update({ name, code, description });
+  } else {
+    await db.collection('projects').add({
+      name, code, description, type: 'adm', active: true, assignedUserIds: [],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: currentUser.uid
+    });
+  }
+  $('admForm').classList.add('hidden');
+  showStamp('Saved');
+});
+
+$('admTable').addEventListener('click', async (e) => {
+  const editId = e.target.dataset.editAdm;
+  const toggleId = e.target.dataset.toggleAdm;
+  const accessId = e.target.dataset.accessAdm;
+
+  if (editId) {
+    const p = admCache.find(x => x.id === editId);
+    editingAdmId = editId;
+    $('admId').value = editId;
+    $('admName').value = p.name;
+    $('admCode').value = p.code || '';
+    $('admDesc').value = p.description || '';
+    $('admAccessPanel').classList.add('hidden');
+    $('admForm').classList.remove('hidden');
+  }
+  if (toggleId) {
+    const p = admCache.find(x => x.id === toggleId);
+    await db.collection('projects').doc(toggleId).update({ active: p.active === false ? true : false });
+  }
+  if (accessId) {
+    const p = admCache.find(x => x.id === accessId);
+    admAccessProjectId = accessId;
+    $('admAccessName').textContent = p.name;
+    const assigned = new Set(p.assignedUserIds || []);
+    $('admAccessCheckboxes').innerHTML = allUsersCache.length
+      ? allUsersCache.map(u => `
+          <label class="checkbox-row">
+            <input type="checkbox" value="${u.uid}" ${assigned.has(u.uid) ? 'checked' : ''} />
+            ${escapeHtml(u.name)}
+          </label>`).join('')
+      : `<p class="empty-state">No one has signed up yet.</p>`;
+    $('admForm').classList.add('hidden');
+    $('admAccessPanel').classList.remove('hidden');
+  }
+});
+
+$('saveAdmAccessBtn').addEventListener('click', async () => {
+  const checked = [...$('admAccessCheckboxes').querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
+  await db.collection('projects').doc(admAccessProjectId).update({ assignedUserIds: checked });
+  $('admAccessPanel').classList.add('hidden');
+  showStamp('Saved');
+});
+
+$('cancelAdmAccessBtn').addEventListener('click', () => $('admAccessPanel').classList.add('hidden'));
+
+// ============================================================
 // User: weekly hours grid
 // ============================================================
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -728,31 +849,41 @@ function renderWeekGrid() {
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const dateStrs = weekDates.map(toISODate);
 
-  $('weekGridHeadRow').innerHTML = '<th>Project</th>' +
+  $('weekGridHeadRow').innerHTML = '<th>Project / ADM</th>' +
     weekDates.map((d, i) => `<th class="num ${i >= 5 ? 'weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth() + 1}</span></th>`).join('') +
     '<th class="num">Total</th>';
 
+  const visibleAdm = admCache.filter(p => p.active !== false && isProjectVisibleToCurrentUser(p));
   const visibleProjects = projectsCache.filter(p => p.active !== false && isProjectVisibleToCurrentUser(p));
-  const hasProjects = visibleProjects.length > 0;
-  $('noProjectsState').classList.toggle('hidden', hasProjects);
-  $('weekGridTable').classList.toggle('hidden', !hasProjects);
+  const hasItems = visibleAdm.length > 0 || visibleProjects.length > 0;
+  $('noProjectsState').classList.toggle('hidden', hasItems);
+  $('weekGridTable').classList.toggle('hidden', !hasItems);
 
   const entryFor = (projectId, date) => userEntriesCache.find(en => en.projectId === projectId && en.date === date);
+  const colspan = 9; // label + 7 days + total
 
-  $('weekGridBody').innerHTML = visibleProjects.map(p => {
-    let rowTotal = 0;
-    const cells = dateStrs.map((ds, i) => {
-      const en = entryFor(p.id, ds);
-      const hours = en ? en.hours : 0;
-      rowTotal += hours;
-      return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
-        data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
+  const renderSection = (items, label) => {
+    if (!items.length) return '';
+    const header = `<tr class="grid-section-header"><td colspan="${colspan}">${label}</td></tr>`;
+    const rows = items.map(p => {
+      let rowTotal = 0;
+      const cells = dateStrs.map((ds, i) => {
+        const en = entryFor(p.id, ds);
+        const hours = en ? en.hours : 0;
+        rowTotal += hours;
+        return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
+          data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
+      }).join('');
+      return `<tr><td>${projectLabelHtml(p)}</td>${cells}<td class="num row-total">${trimZeros(rowTotal)}</td></tr>`;
     }).join('');
-    return `<tr><td>${projectLabelHtml(p)}</td>${cells}<td class="num row-total">${trimZeros(rowTotal)}</td></tr>`;
-  }).join('');
+    return header + rows;
+  };
 
+  $('weekGridBody').innerHTML = renderSection(visibleProjects, 'Projects') + renderSection(visibleAdm, 'ADM');
+
+  const allVisible = [...visibleAdm, ...visibleProjects];
   const dayTotals = dateStrs.map(ds =>
-    visibleProjects.reduce((sum, p) => {
+    allVisible.reduce((sum, p) => {
       const en = entryFor(p.id, ds);
       return sum + (en ? en.hours : 0);
     }, 0)
@@ -776,7 +907,7 @@ $('weekGridBody').addEventListener('change', async (e) => {
     return;
   }
   const hours = raw === '' ? 0 : parseFloat(raw);
-  const project = projectsCache.find(p => p.id === projectId);
+  const project = projectsCache.find(p => p.id === projectId) || admCache.find(p => p.id === projectId);
   const existing = userEntriesCache.find(en => en.projectId === projectId && en.date === date);
 
   input.disabled = true;
