@@ -172,9 +172,24 @@
 
         <div class="table-wrap">
           <table class="ledger-table" id="projectsTable">
-            <thead><tr><th>No.</th><th>Project</th><th>Client</th><th>Status</th><th>Visible to</th><th></th></tr></thead>
+            <thead><tr><th>No.</th><th>Project</th><th>Client</th><th>Visible to</th><th></th></tr></thead>
             <tbody></tbody>
           </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="archivedToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Archived projects <span class="chevron collapsed" id="archivedChevron">▾</span></h2>
+        </div>
+        <div id="archivedBody" class="collapsible-body hidden">
+          <div class="table-wrap">
+            <table class="ledger-table" id="archivedTable">
+              <thead><tr><th>No.</th><th>Project</th><th>Client</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="archivedEmpty" class="empty-state hidden">No archived projects.</p>
         </div>
       </div>
 

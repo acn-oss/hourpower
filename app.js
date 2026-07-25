@@ -568,27 +568,45 @@ function renderFilterProjectSelect() {
 
 function renderProjectsTable() {
   const tbody = $('projectsTable').querySelector('tbody');
-  if (!projectsCache.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No projects yet — create the first one above.</td></tr>`;
+  const active = projectsCache.filter(p => p.active !== false);
+  if (!active.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No projects yet — create the first one above.</td></tr>`;
+    renderArchivedProjectsTable();
     return;
   }
-  tbody.innerHTML = projectsCache.map(p => {
+  tbody.innerHTML = active.map(p => {
     const n = (p.assignedUserIds || []).length;
     return `
     <tr>
       <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
       <td>${escapeHtml(p.name)}</td>
       <td>${escapeHtml(p.client || '')}</td>
-      <td><span class="stamp-badge ${p.active === false ? 'stamp-badge-off' : ''}">${p.active === false ? 'Archived' : 'Active'}</span></td>
       <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
       <td class="row-actions">
         <button class="link-btn" data-edit-project="${p.id}">Edit</button>
         <button class="link-btn" data-access-project="${p.id}">Access</button>
-        <button class="link-btn" data-toggle-project="${p.id}">${p.active === false ? 'Unarchive' : 'Archive'}</button>
+        <button class="link-btn" data-toggle-project="${p.id}">Archive</button>
       </td>
-    </tr>
-  `;
+    </tr>`;
   }).join('');
+  renderArchivedProjectsTable();
+}
+
+function renderArchivedProjectsTable() {
+  const archived = projectsCache.filter(p => p.active === false);
+  const tbody = $('archivedTable').querySelector('tbody');
+  $('archivedEmpty').classList.toggle('hidden', archived.length > 0);
+  $('archivedTable').classList.toggle('hidden', archived.length === 0);
+  tbody.innerHTML = archived.map(p => `
+    <tr>
+      <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${escapeHtml(p.client || '')}</td>
+      <td class="row-actions">
+        <button class="link-btn" data-unarchive-project="${p.id}">Unarchive</button>
+        <button class="link-btn link-danger" data-delete-project="${p.id}">Delete</button>
+      </td>
+    </tr>`).join('');
 }
 
 $('newProjectBtn').addEventListener('click', () => {
@@ -696,13 +714,30 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectForm').classList.remove('hidden');
   }
   if (toggleId) {
-    const p = projectsCache.find(x => x.id === toggleId);
-    await db.collection('projects').doc(toggleId).update({ active: p.active === false ? true : false });
+    await db.collection('projects').doc(toggleId).update({ active: false });
   }
   if (accessId) {
     openAccessPanel(accessId);
   }
 });
+
+$('archivedTable').addEventListener('click', async (e) => {
+  const unarchiveId = e.target.dataset.unarchiveProject;
+  const deleteId = e.target.dataset.deleteProject;
+
+  if (unarchiveId) {
+    await db.collection('projects').doc(unarchiveId).update({ active: true });
+  }
+  if (deleteId) {
+    const p = projectsCache.find(x => x.id === deleteId);
+    const name = p ? `"${p.name}"` : 'this project';
+    if (confirm(`Permanently delete ${name}?\n\nThis cannot be undone. Logged hours for this project will remain in All entries but the project itself will be gone.`)) {
+      await db.collection('projects').doc(deleteId).delete();
+    }
+  }
+});
+
+makeToggle('archivedToggle', 'archivedBody', 'archivedChevron');
 
 function openAccessPanel(projectId) {
   const p = projectsCache.find(x => x.id === projectId);
