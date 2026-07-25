@@ -33,6 +33,8 @@ let allUsersUnsub = null;
 let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
+let projectSortKey = 'code';
+let projectSortDir = 'asc';
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
 
@@ -571,7 +573,30 @@ function renderFilterProjectSelect() {
 
 function renderProjectsTable() {
   const tbody = $('projectsTable').querySelector('tbody');
+  const thead = $('projectsTable').querySelector('thead tr');
+
+  // Render clickable headers with sort indicators
+  const cols = [
+    { key: 'code',   label: 'No.'     },
+    { key: 'name',   label: 'Project' },
+    { key: 'client', label: 'Client'  }
+  ];
+  thead.innerHTML = cols.map(({ key, label }) => {
+    const active = projectSortKey === key;
+    const arrow = active ? (projectSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+    return `<th class="sortable-th${active ? ' sort-active' : ''}" data-sort-key="${key}">${label}${arrow}</th>`;
+  }).join('') + '<th>Visible to</th><th></th>';
+
   const active = projectsCache.filter(p => p.active !== false);
+
+  // Sort by selected column
+  active.sort((a, b) => {
+    const valA = (a[projectSortKey] || '').toLowerCase();
+    const valB = (b[projectSortKey] || '').toLowerCase();
+    const cmp = valA.localeCompare(valB);
+    return projectSortDir === 'asc' ? cmp : -cmp;
+  });
+
   if (!active.length) {
     tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No projects yet — create the first one above.</td></tr>`;
     renderArchivedProjectsTable();
@@ -695,6 +720,19 @@ function parseNonNegative(raw) {
   const v = parseFloat(String(raw).trim());
   return (!isNaN(v) && v >= 0) ? v : 0;
 }
+
+$('projectsTable').querySelector('thead').addEventListener('click', (e) => {
+  const th = e.target.closest('[data-sort-key]');
+  if (!th) return;
+  const key = th.dataset.sortKey;
+  if (projectSortKey === key) {
+    projectSortDir = projectSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    projectSortKey = key;
+    projectSortDir = 'asc';
+  }
+  renderProjectsTable();
+});
 
 $('projectsTable').addEventListener('click', async (e) => {
   const editId = e.target.dataset.editProject;

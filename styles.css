@@ -498,6 +498,14 @@ input, select, textarea {
   margin: 12px 2px 0;
 }
 
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.sortable-th:hover { color: var(--accent-dark); }
+.sort-active { color: var(--accent-dark); }
+
 .grid-section-header td {
   background: var(--line-soft);
   font-size: 0.7rem;
