@@ -21,11 +21,11 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 let currentUser = null;      // { uid, name, email, role }
-let projectsCache = [];      // [{id, name, description, active, assignedUserIds}]
-let userEntriesCache = [];   // current user's entries (all dates)
+let projectsCache = [];
+let userEntriesCache = [];
 let allEntriesCache = [];
-let allUsersCache = [];      // editor only
-let ratesCache = {};         // editor only
+let allUsersCache = [];
+let ratesCache = {};
 let filteredRows = [];
 let userEntriesUnsub = null;
 let allEntriesUnsub = null;
@@ -33,10 +33,18 @@ let allUsersUnsub = null;
 let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
-let editingAdmId = null;
-let admAccessProjectId = null;
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
+
+// Generic extra-type system (ADM, AQ, INT — all stored in the projects collection with a type field)
+const EXTRA_TYPES = [
+  { type: 'adm', label: 'ADM' },
+  { type: 'aq',  label: 'AQ'  },
+  { type: 'int', label: 'INT' }
+];
+let extraCache = { adm: [], aq: [], int: [] };
+let currentExtraEdit   = { type: null, id: null };
+let currentExtraAccess = { type: null, id: null };
 
 function showStamp(text) {
   const el = $('stamp');
@@ -255,6 +263,7 @@ auth.onAuthStateChanged(async (user) => {
   if (currentUser.role === 'user') {
     listenUserEntries();
   } else {
+    initExtraTypeCards();
     listenAllEntriesForEditor();
     listenAllUsers();
     listenRates();
@@ -276,10 +285,12 @@ function listenProjects() {
     const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     all.sort(compareProjectsByCodeDesc);
     projectsCache = all.filter(p => (p.type || 'project') === 'project');
-    admCache = all.filter(p => p.type === 'adm');
+    EXTRA_TYPES.forEach(({ type }) => {
+      extraCache[type] = all.filter(p => p.type === type);
+    });
     if (currentUser.role === 'editor') {
       renderProjectsTable();
-      renderAdmTable();
+      EXTRA_TYPES.forEach(({ type }) => renderExtraTable(type));
       renderFilterProjectSelect();
     } else {
       renderWeekGrid();
@@ -330,7 +341,7 @@ function listenAllUsers() {
   allUsersUnsub = db.collection('users').orderBy('name').onSnapshot((snap) => {
     allUsersCache = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.role !== 'editor');
     renderProjectsTable();
-    renderAdmTable();
+    EXTRA_TYPES.forEach(({ type }) => renderExtraTable(type));
     renderRatesTable();
     renderWeekOverview();
   });
@@ -533,21 +544,21 @@ function renderProjectTotals() {
 $('totalsProjectSelect').addEventListener('change', renderProjectTotals);
 
 function renderFilterProjectSelect() {
-  // All entries filter — ADM and Projects grouped
   const filterSel = $('filterProject');
   const filterCurrent = filterSel.value;
-  filterSel.innerHTML = '<option value="">All projects & ADM</option>';
-  if (admCache.length) {
-    filterSel.innerHTML += `<optgroup label="ADM">${admCache.map(p =>
-      `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('')}</optgroup>`;
-  }
+  filterSel.innerHTML = '<option value="">All items</option>';
+  EXTRA_TYPES.forEach(({ type, label }) => {
+    if (extraCache[type].length) {
+      filterSel.innerHTML += `<optgroup label="${label}">${extraCache[type].map(p =>
+        `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('')}</optgroup>`;
+    }
+  });
   if (projectsCache.length) {
     filterSel.innerHTML += `<optgroup label="Projects">${projectsCache.map(p =>
       `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('')}</optgroup>`;
   }
   filterSel.value = filterCurrent;
 
-  // Project totals — only real projects
   const totalsSel = $('totalsProjectSelect');
   const totalsCurrent = totalsSel.value;
   totalsSel.innerHTML = '<option value="">Choose a project…</option>' +
@@ -719,15 +730,151 @@ $('saveAccessBtn').addEventListener('click', async () => {
 $('cancelAccessBtn').addEventListener('click', () => $('accessPanel').classList.add('hidden'));
 
 // ============================================================
-// ADM table, form, and access panel
 // ============================================================
-function renderAdmTable() {
-  const tbody = $('admTable').querySelector('tbody');
-  if (!admCache.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No ADM items yet — create the first one above.</td></tr>`;
+// Generic extra-type cards (ADM, AQ, INT)
+// ============================================================
+function initExtraTypeCards() {
+  $('extraTypesContainer').innerHTML = EXTRA_TYPES.map(({ type, label }) => `
+    <div class="card">
+      <div class="card-header-row">
+        <h2>${label}</h2>
+        <button type="button" class="btn btn-primary" id="newBtn-${type}">+ New ${label}</button>
+      </div>
+      <form id="form-${type}" class="stacked-form hidden">
+        <input type="hidden" id="formId-${type}" />
+        <label>Name
+          <input type="text" id="formName-${type}" required />
+        </label>
+        <div class="field-row">
+          <label>Code <span class="optional">optional, e.g. AB12</span>
+            <input type="text" id="formCode-${type}" maxlength="4" placeholder="AB12" />
+          </label>
+          <label>Description <span class="optional">optional</span>
+            <input type="text" id="formDesc-${type}" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Save ${label}</button>
+          <button type="button" class="btn btn-ghost extra-cancel" data-type="${type}">Cancel</button>
+        </div>
+      </form>
+      <div id="access-${type}" class="stacked-form hidden">
+        <p class="access-intro">Who can log hours to <strong id="accessName-${type}"></strong>? Leave everyone unchecked to keep it open to your whole team.</p>
+        <div id="accessList-${type}" class="checkbox-list"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary extra-save-access" data-type="${type}">Save access</button>
+          <button type="button" class="btn btn-ghost extra-cancel-access" data-type="${type}">Cancel</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="ledger-table" id="table-${type}">
+          <thead><tr><th>No.</th><th>Name</th><th>Status</th><th>Visible to</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  `).join('');
+
+  EXTRA_TYPES.forEach(({ type, label }) => {
+    document.getElementById(`newBtn-${type}`).addEventListener('click', () => {
+      currentExtraEdit = { type, id: null };
+      document.getElementById(`formId-${type}`).value = '';
+      document.getElementById(`formName-${type}`).value = '';
+      document.getElementById(`formCode-${type}`).value = '';
+      document.getElementById(`formDesc-${type}`).value = '';
+      document.getElementById(`access-${type}`).classList.add('hidden');
+      document.getElementById(`form-${type}`).classList.remove('hidden');
+      document.getElementById(`formName-${type}`).focus();
+    });
+
+    document.getElementById(`form-${type}`).addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById(`formName-${type}`).value.trim();
+      const code = document.getElementById(`formCode-${type}`).value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+      const description = document.getElementById(`formDesc-${type}`).value.trim();
+      if (!name) return;
+      document.getElementById(`formCode-${type}`).value = code;
+
+      if (currentExtraEdit.id) {
+        await db.collection('projects').doc(currentExtraEdit.id).update({ name, code, description });
+      } else {
+        await db.collection('projects').add({
+          name, code, description, type, active: true, assignedUserIds: [],
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdBy: currentUser.uid
+        });
+      }
+      document.getElementById(`form-${type}`).classList.add('hidden');
+      showStamp('Saved');
+    });
+
+    document.getElementById(`table-${type}`).addEventListener('click', async (e) => {
+      const editId = e.target.dataset.extraEdit;
+      const toggleId = e.target.dataset.extraToggle;
+      const accessId = e.target.dataset.extraAccess;
+
+      if (editId) {
+        const p = extraCache[type].find(x => x.id === editId);
+        currentExtraEdit = { type, id: editId };
+        document.getElementById(`formId-${type}`).value = editId;
+        document.getElementById(`formName-${type}`).value = p.name;
+        document.getElementById(`formCode-${type}`).value = p.code || '';
+        document.getElementById(`formDesc-${type}`).value = p.description || '';
+        document.getElementById(`access-${type}`).classList.add('hidden');
+        document.getElementById(`form-${type}`).classList.remove('hidden');
+      }
+      if (toggleId) {
+        const p = extraCache[type].find(x => x.id === toggleId);
+        await db.collection('projects').doc(toggleId).update({ active: p.active === false ? true : false });
+      }
+      if (accessId) {
+        const p = extraCache[type].find(x => x.id === accessId);
+        currentExtraAccess = { type, id: accessId };
+        document.getElementById(`accessName-${type}`).textContent = p.name;
+        const assigned = new Set(p.assignedUserIds || []);
+        document.getElementById(`accessList-${type}`).innerHTML = allUsersCache.length
+          ? allUsersCache.map(u => `
+              <label class="checkbox-row">
+                <input type="checkbox" value="${u.uid}" ${assigned.has(u.uid) ? 'checked' : ''} />
+                ${escapeHtml(u.name)}
+              </label>`).join('')
+          : `<p class="empty-state">No one has signed up yet.</p>`;
+        document.getElementById(`form-${type}`).classList.add('hidden');
+        document.getElementById(`access-${type}`).classList.remove('hidden');
+      }
+    });
+  });
+
+  // Shared delegated handlers for cancel / save-access buttons
+  $('extraTypesContainer').addEventListener('click', async (e) => {
+    const type = e.target.dataset.type;
+    if (!type) return;
+    if (e.target.classList.contains('extra-cancel')) {
+      document.getElementById(`form-${type}`).classList.add('hidden');
+    }
+    if (e.target.classList.contains('extra-cancel-access')) {
+      document.getElementById(`access-${type}`).classList.add('hidden');
+    }
+    if (e.target.classList.contains('extra-save-access')) {
+      const checked = [...document.getElementById(`accessList-${type}`).querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
+      await db.collection('projects').doc(currentExtraAccess.id).update({ assignedUserIds: checked });
+      document.getElementById(`access-${type}`).classList.add('hidden');
+      showStamp('Saved');
+    }
+  });
+}
+
+function renderExtraTable(type) {
+  const tbody = document.getElementById(`table-${type}`);
+  if (!tbody) return; // cards not yet initialised
+  const tbodyEl = tbody.querySelector('tbody');
+  const items = extraCache[type];
+  const label = EXTRA_TYPES.find(t => t.type === type).label;
+  if (!items.length) {
+    tbodyEl.innerHTML = `<tr><td colspan="5" class="empty-state">No ${label} items yet.</td></tr>`;
     return;
   }
-  tbody.innerHTML = admCache.map(p => {
+  tbodyEl.innerHTML = items.map(p => {
     const n = (p.assignedUserIds || []).length;
     return `
     <tr>
@@ -736,92 +883,13 @@ function renderAdmTable() {
       <td><span class="stamp-badge ${p.active === false ? 'stamp-badge-off' : ''}">${p.active === false ? 'Archived' : 'Active'}</span></td>
       <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
       <td class="row-actions">
-        <button class="link-btn" data-edit-adm="${p.id}">Edit</button>
-        <button class="link-btn" data-access-adm="${p.id}">Access</button>
-        <button class="link-btn" data-toggle-adm="${p.id}">${p.active === false ? 'Unarchive' : 'Archive'}</button>
+        <button class="link-btn" data-extra-edit="${p.id}">Edit</button>
+        <button class="link-btn" data-extra-access="${p.id}">Access</button>
+        <button class="link-btn" data-extra-toggle="${p.id}">${p.active === false ? 'Unarchive' : 'Archive'}</button>
       </td>
     </tr>`;
   }).join('');
 }
-
-$('newAdmBtn').addEventListener('click', () => {
-  editingAdmId = null;
-  $('admId').value = '';
-  $('admName').value = '';
-  $('admCode').value = '';
-  $('admDesc').value = '';
-  $('admAccessPanel').classList.add('hidden');
-  $('admForm').classList.remove('hidden');
-  $('admName').focus();
-});
-
-$('cancelAdmBtn').addEventListener('click', () => $('admForm').classList.add('hidden'));
-
-$('admForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const name = $('admName').value.trim();
-  const code = $('admCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
-  const description = $('admDesc').value.trim();
-  if (!name) return;
-  $('admCode').value = code;
-
-  if (editingAdmId) {
-    await db.collection('projects').doc(editingAdmId).update({ name, code, description });
-  } else {
-    await db.collection('projects').add({
-      name, code, description, type: 'adm', active: true, assignedUserIds: [],
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      createdBy: currentUser.uid
-    });
-  }
-  $('admForm').classList.add('hidden');
-  showStamp('Saved');
-});
-
-$('admTable').addEventListener('click', async (e) => {
-  const editId = e.target.dataset.editAdm;
-  const toggleId = e.target.dataset.toggleAdm;
-  const accessId = e.target.dataset.accessAdm;
-
-  if (editId) {
-    const p = admCache.find(x => x.id === editId);
-    editingAdmId = editId;
-    $('admId').value = editId;
-    $('admName').value = p.name;
-    $('admCode').value = p.code || '';
-    $('admDesc').value = p.description || '';
-    $('admAccessPanel').classList.add('hidden');
-    $('admForm').classList.remove('hidden');
-  }
-  if (toggleId) {
-    const p = admCache.find(x => x.id === toggleId);
-    await db.collection('projects').doc(toggleId).update({ active: p.active === false ? true : false });
-  }
-  if (accessId) {
-    const p = admCache.find(x => x.id === accessId);
-    admAccessProjectId = accessId;
-    $('admAccessName').textContent = p.name;
-    const assigned = new Set(p.assignedUserIds || []);
-    $('admAccessCheckboxes').innerHTML = allUsersCache.length
-      ? allUsersCache.map(u => `
-          <label class="checkbox-row">
-            <input type="checkbox" value="${u.uid}" ${assigned.has(u.uid) ? 'checked' : ''} />
-            ${escapeHtml(u.name)}
-          </label>`).join('')
-      : `<p class="empty-state">No one has signed up yet.</p>`;
-    $('admForm').classList.add('hidden');
-    $('admAccessPanel').classList.remove('hidden');
-  }
-});
-
-$('saveAdmAccessBtn').addEventListener('click', async () => {
-  const checked = [...$('admAccessCheckboxes').querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
-  await db.collection('projects').doc(admAccessProjectId).update({ assignedUserIds: checked });
-  $('admAccessPanel').classList.add('hidden');
-  showStamp('Saved');
-});
-
-$('cancelAdmAccessBtn').addEventListener('click', () => $('admAccessPanel').classList.add('hidden'));
 
 // ============================================================
 // User: weekly hours grid
@@ -854,14 +922,17 @@ function renderWeekGrid() {
     weekDates.map((d, i) => `<th class="num ${i >= 5 ? 'weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth() + 1}</span></th>`).join('') +
     '<th class="num">Total</th>';
 
-  const visibleAdm = admCache.filter(p => p.active !== false && isProjectVisibleToCurrentUser(p));
   const visibleProjects = projectsCache.filter(p => p.active !== false && isProjectVisibleToCurrentUser(p));
-  const hasItems = visibleAdm.length > 0 || visibleProjects.length > 0;
+  const visibleExtras = EXTRA_TYPES.map(({ type, label }) => ({
+    label,
+    items: (extraCache[type] || []).filter(p => p.active !== false && isProjectVisibleToCurrentUser(p))
+  }));
+  const hasItems = visibleProjects.length > 0 || visibleExtras.some(g => g.items.length > 0);
   $('noProjectsState').classList.toggle('hidden', hasItems);
   $('weekGridTable').classList.toggle('hidden', !hasItems);
 
   const entryFor = (projectId, date) => userEntriesCache.find(en => en.projectId === projectId && en.date === date);
-  const colspan = 9; // label + 7 days + total
+  const colspan = 9;
 
   const renderSection = (items, label) => {
     if (!items.length) return '';
@@ -880,9 +951,11 @@ function renderWeekGrid() {
     return header + rows;
   };
 
-  $('weekGridBody').innerHTML = renderSection(visibleProjects, 'Projects') + renderSection(visibleAdm, 'ADM');
+  $('weekGridBody').innerHTML =
+    renderSection(visibleProjects, 'Projects') +
+    visibleExtras.map(g => renderSection(g.items, g.label)).join('');
 
-  const allVisible = [...visibleAdm, ...visibleProjects];
+  const allVisible = [...visibleProjects, ...visibleExtras.flatMap(g => g.items)];
   const dayTotals = dateStrs.map(ds =>
     allVisible.reduce((sum, p) => {
       const en = entryFor(p.id, ds);
@@ -908,7 +981,8 @@ $('weekGridBody').addEventListener('change', async (e) => {
     return;
   }
   const hours = raw === '' ? 0 : parseFloat(raw);
-  const project = projectsCache.find(p => p.id === projectId) || admCache.find(p => p.id === projectId);
+  const project = projectsCache.find(p => p.id === projectId) ||
+    EXTRA_TYPES.flatMap(({ type }) => extraCache[type]).find(p => p.id === projectId);
   const existing = userEntriesCache.find(en => en.projectId === projectId && en.date === date);
 
   input.disabled = true;

@@ -178,47 +178,7 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header-row">
-          <h2>ADM</h2>
-          <button id="newAdmBtn" class="btn btn-primary" type="button">+ New ADM</button>
-        </div>
-
-        <form id="admForm" class="stacked-form hidden">
-          <input type="hidden" id="admId" />
-          <label>Name
-            <input type="text" id="admName" required />
-          </label>
-          <div class="field-row">
-            <label>Code <span class="optional">optional, e.g. AB12</span>
-              <input type="text" id="admCode" maxlength="4" placeholder="AB12" />
-            </label>
-            <label>Description <span class="optional">optional</span>
-              <input type="text" id="admDesc" />
-            </label>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Save ADM</button>
-            <button type="button" id="cancelAdmBtn" class="btn btn-ghost">Cancel</button>
-          </div>
-        </form>
-
-        <div id="admAccessPanel" class="stacked-form hidden">
-          <p class="access-intro">Who can log hours to <strong id="admAccessName"></strong>? Leave everyone unchecked to keep it open to your whole team.</p>
-          <div id="admAccessCheckboxes" class="checkbox-list"></div>
-          <div class="form-actions">
-            <button type="button" id="saveAdmAccessBtn" class="btn btn-primary">Save access</button>
-            <button type="button" id="cancelAdmAccessBtn" class="btn btn-ghost">Cancel</button>
-          </div>
-        </div>
-
-        <div class="table-wrap">
-          <table class="ledger-table" id="admTable">
-            <thead><tr><th>No.</th><th>Name</th><th>Status</th><th>Visible to</th><th></th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
+      <div id="extraTypesContainer"></div>
 
       <div class="card">
         <div class="card-header-row">
