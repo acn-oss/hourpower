@@ -52,6 +52,7 @@ let allUsersUnsub = null;
 let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
+let editingProjectUsers = []; // users shown in the per-user rate sections
 let projectSortKey = 'code';
 let projectSortDir = 'desc';
 let weekStart = getMonday(new Date());
@@ -533,7 +534,17 @@ function formatDkk(n) {
 
 function resolveProjectRate(project, dateStr, uid) {
   const standard = ratesCache[uid] || {};
-  const lines = (project && project.rateLines) || [];
+  const rateData = project && project.rateLines;
+
+  // Support old global array format and new per-user object format
+  let lines = [];
+  if (rateData) {
+    if (Array.isArray(rateData)) {
+      lines = rateData; // legacy: global rate for all users
+    } else if (rateData[uid]) {
+      lines = rateData[uid]; // new: per-user rates
+    }
+  }
 
   let applicable = null;
   for (const line of lines) {
@@ -543,7 +554,7 @@ function resolveProjectRate(project, dateStr, uid) {
   }
 
   const salesRate = (applicable && applicable.salesRate != null) ? applicable.salesRate : (standard.salesRate || 0);
-  const costRate = (applicable && applicable.costRate != null) ? applicable.costRate : (standard.costRate || 0);
+  const costRate  = (applicable && applicable.costRate  != null) ? applicable.costRate  : (standard.costRate  || 0);
   return { salesRate, costRate };
 }
 
@@ -724,44 +735,72 @@ $('newProjectBtn').addEventListener('click', () => {
   $('projectDesc').value = '';
   $('projectExpectedFee').value = '';
   $('projectSubadvisors').value = '';
-  clearRateLineInputs();
+  buildRateLinesSections(null);
   $('accessPanel').classList.add('hidden');
   $('projectForm').classList.remove('hidden');
   $('projectName').focus();
 });
 
-const RATE_LINE_COUNT = 5;
+const RATE_ROW_COUNT = 5;
 
-function clearRateLineInputs() {
-  for (let i = 0; i < RATE_LINE_COUNT; i++) {
-    $(`rateLineDate${i}`).value = '';
-    $(`rateLineSales${i}`).value = '';
-    $(`rateLineCost${i}`).value = '';
+function buildRateLinesSections(project) {
+  // Determine which users to show rate rows for
+  const assignedIds = project ? (project.assignedUserIds || []) : [];
+  editingProjectUsers = assignedIds.length > 0
+    ? allUsersCache.filter(u => assignedIds.includes(u.uid))
+    : [...allUsersCache];
+
+  const rateData = (project && project.rateLines && !Array.isArray(project.rateLines))
+    ? project.rateLines : {};
+
+  const container = document.getElementById('rateLinesSections');
+  if (!editingProjectUsers.length) {
+    container.innerHTML = `<p class="empty-state" style="margin:8px 0">No employees assigned yet — set access first, then add per-employee rates.</p>`;
+    return;
   }
+
+  container.innerHTML = editingProjectUsers.map((u, ui) => {
+    const userLines = (rateData[u.uid] || []).slice(0, RATE_ROW_COUNT);
+    const rows = Array.from({ length: RATE_ROW_COUNT }, (_, ri) => {
+      const line = userLines[ri] || {};
+      return `<tr>
+        <td><input type="date" id="rd_${ui}_${ri}" value="${line.usedFrom || ''}" /></td>
+        <td class="num"><input type="number" min="0" step="1" class="rate-input" id="rs_${ui}_${ri}" value="${line.salesRate != null ? line.salesRate : ''}" /></td>
+        <td class="num"><input type="number" min="0" step="1" class="rate-input" id="rc_${ui}_${ri}" value="${line.costRate != null ? line.costRate : ''}" /></td>
+      </tr>`;
+    }).join('');
+    return `
+      <div class="user-rate-section">
+        <p class="user-rate-name">${escapeHtml(u.name)}</p>
+        <div class="table-wrap">
+          <table class="ledger-table rate-lines-table">
+            <thead><tr><th>Used from</th><th class="num">Sales rate (DKK/h)</th><th class="num">Cost rate (DKK/h)</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
 }
 
-function fillRateLineInputs(rateLines) {
-  clearRateLineInputs();
-  (rateLines || []).slice(0, RATE_LINE_COUNT).forEach((line, i) => {
-    $(`rateLineDate${i}`).value = line.usedFrom || '';
-    $(`rateLineSales${i}`).value = line.salesRate != null ? line.salesRate : '';
-    $(`rateLineCost${i}`).value = line.costRate != null ? line.costRate : '';
+function readPerUserRateLines() {
+  const result = {};
+  editingProjectUsers.forEach((u, ui) => {
+    const lines = [];
+    for (let ri = 0; ri < RATE_ROW_COUNT; ri++) {
+      const dateEl = document.getElementById(`rd_${ui}_${ri}`);
+      if (!dateEl) continue;
+      const usedFrom = dateEl.value;
+      if (!usedFrom) continue;
+      const salesRaw = document.getElementById(`rs_${ui}_${ri}`).value.trim();
+      const costRaw  = document.getElementById(`rc_${ui}_${ri}`).value.trim();
+      const salesRate = (salesRaw !== '' && !isNaN(parseFloat(salesRaw)) && parseFloat(salesRaw) >= 0) ? parseFloat(salesRaw) : null;
+      const costRate  = (costRaw  !== '' && !isNaN(parseFloat(costRaw))  && parseFloat(costRaw)  >= 0) ? parseFloat(costRaw)  : null;
+      lines.push({ usedFrom, salesRate, costRate });
+    }
+    lines.sort((a, b) => a.usedFrom.localeCompare(b.usedFrom));
+    if (lines.length) result[u.uid] = lines;
   });
-}
-
-function readRateLineInputs() {
-  const lines = [];
-  for (let i = 0; i < RATE_LINE_COUNT; i++) {
-    const usedFrom = $(`rateLineDate${i}`).value;
-    if (!usedFrom) continue;
-    const salesRaw = $(`rateLineSales${i}`).value.trim();
-    const costRaw = $(`rateLineCost${i}`).value.trim();
-    const salesRate = (salesRaw !== '' && !isNaN(parseFloat(salesRaw)) && parseFloat(salesRaw) >= 0) ? parseFloat(salesRaw) : null;
-    const costRate = (costRaw !== '' && !isNaN(parseFloat(costRaw)) && parseFloat(costRaw) >= 0) ? parseFloat(costRaw) : null;
-    lines.push({ usedFrom, salesRate, costRate });
-  }
-  lines.sort((a, b) => a.usedFrom.localeCompare(b.usedFrom));
-  return lines;
+  return result;
 }
 
 $('cancelProjectBtn').addEventListener('click', () => {
@@ -776,7 +815,7 @@ $('projectForm').addEventListener('submit', async (e) => {
   const description = $('projectDesc').value.trim();
   const expectedFee = parseNonNegative($('projectExpectedFee').value);
   const subadvisors = parseNonNegative($('projectSubadvisors').value);
-  const rateLines = readRateLineInputs();
+  const rateLines = readPerUserRateLines();
   if (!name) return;
 
   if (editingProjectId) {
@@ -827,7 +866,7 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectDesc').value = p.description || '';
     $('projectExpectedFee').value = p.expectedFee || '';
     $('projectSubadvisors').value = p.subadvisors || '';
-    fillRateLineInputs(p.rateLines);
+    buildRateLinesSections(p);
     $('accessPanel').classList.add('hidden');
     $('projectForm').classList.remove('hidden');
   }
