@@ -153,19 +153,21 @@ $('forgotPasswordBtn').addEventListener('click', async () => {
   const email = $('loginEmail').value.trim();
   const msg = $('forgotMsg');
   if (!email) {
-    msg.textContent = 'Enter your email address above first, then click "Forgot password?".';
+    msg.innerHTML = '⚠ Enter your email address in the field above first.';
     msg.style.color = 'var(--stamp)';
     msg.classList.remove('hidden');
     return;
   }
   try {
     await auth.sendPasswordResetEmail(email);
-    msg.textContent = `Reset link sent to ${email} — check your inbox (and spam folder).`;
+    msg.innerHTML = `✓ Reset link sent to <strong>${escapeHtml(email)}</strong>.<br>
+      Check your inbox — and if you don't see it within a minute or two, <strong>check your spam or junk folder</strong>.`;
     msg.style.color = 'var(--accent-dark)';
+    $('forgotPasswordBtn').classList.add('hidden');
   } catch (err) {
-    msg.textContent = err.code === 'auth/user-not-found'
-      ? 'No account found with that email address.'
-      : err.message;
+    msg.innerHTML = err.code === 'auth/user-not-found'
+      ? '⚠ No account found with that email address.'
+      : `⚠ ${escapeHtml(err.message)}`;
     msg.style.color = 'var(--danger)';
   }
   msg.classList.remove('hidden');
@@ -180,6 +182,9 @@ loginForm.addEventListener('submit', async (e) => {
     await auth.signInWithEmailAndPassword(email, password);
   } catch (err) {
     showAuthError(friendlyAuthError(err));
+    // Reveal the forgot-password link after the first failed attempt
+    $('forgotPasswordBtn').classList.remove('hidden');
+    $('forgotMsg').classList.add('hidden');
   }
 });
 
