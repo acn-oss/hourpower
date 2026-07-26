@@ -1100,7 +1100,7 @@ function listenUserEntries() {
 function renderWeekGrid() {
   if (!currentUser || currentUser.role !== 'user') return;
 
-  $('hoursHeading').textContent = `Hours week ${isoWeekNumber(weekStart)}`;
+  $('hoursHeading').textContent = `Hours week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}`;
   $('weekLabel').textContent = weekRangeLabel(weekStart);
 
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -1111,6 +1111,7 @@ function renderWeekGrid() {
     `<th class="sortable-th${userSortKey==='code'?' sort-active':''}" data-user-sort="code">No.${sortArrow('code')}</th>` +
     `<th class="sortable-th${userSortKey==='name'?' sort-active':''}" data-user-sort="name">Project${sortArrow('name')}</th>` +
     weekDates.map((d, i) => `<th class="num ${i >= 5 ? 'weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth() + 1}</span></th>`).join('') +
+    '<th class="num">Total week</th>' +
     '<th class="num">Total</th>';
 
   const sortItems = (items) => [...items].sort((a, b) => {
@@ -1130,7 +1131,8 @@ function renderWeekGrid() {
   $('weekGridTable').classList.toggle('hidden', !hasItems);
 
   const entryFor = (projectId, date) => userEntriesCache.find(en => en.projectId === projectId && en.date === date);
-  const colspan = 10; // No. + Project + 7 days + Total
+  const allHoursForProject = (projectId) => userEntriesCache.filter(en => en.projectId === projectId).reduce((s, en) => s + en.hours, 0);
+  const colspan = 11; // No. + Project + 7 days + Total week + Total
 
   const renderSection = (items, label) => {
     if (!items.length) return '';
@@ -1144,11 +1146,13 @@ function renderWeekGrid() {
         return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
           data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
       }).join('');
+      const overallTotal = allHoursForProject(p.id);
       return `<tr>
         <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
         <td>${escapeHtml(p.name)}</td>
         ${cells}
         <td class="num row-total">${trimZeros(rowTotal)}</td>
+        <td class="num row-total">${trimZeros(overallTotal)}</td>
       </tr>`;
     }).join('');
     return header + rows;
@@ -1165,10 +1169,12 @@ function renderWeekGrid() {
       return sum + (en ? en.hours : 0);
     }, 0)
   );
-  const grandTotal = dayTotals.reduce((s, n) => s + n, 0);
+  const grandTotalWeek = dayTotals.reduce((s, n) => s + n, 0);
+  const grandTotalAll = allVisible.reduce((sum, p) => sum + allHoursForProject(p.id), 0);
   $('weekGridFoot').innerHTML = `<tr class="totals-row"><td colspan="2">Total</td>` +
-    dayTotals.map((t, i) => `<td class="num ${i >= 5 ? 'weekend' : ''}">${trimZeros(t)}</td>`).join('') +
-    `<td class="num">${trimZeros(grandTotal)}</td></tr>`;
+    dayTotals.map((t, i) => `<td class="num right-num ${i >= 5 ? 'weekend' : ''}">${trimZeros(t)}</td>`).join('') +
+    `<td class="num right-num">${trimZeros(grandTotalWeek)}</td>` +
+    `<td class="num right-num">${trimZeros(grandTotalAll)}</td></tr>`;
 }
 
 $('weekGridBody').addEventListener('change', async (e) => {

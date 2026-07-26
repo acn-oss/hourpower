@@ -466,6 +466,7 @@ input, select, textarea {
 .grid-table th:nth-child(2), .grid-table td:nth-child(2) { text-align: left; }
 .grid-table thead th.num { text-align: center; }
 .grid-table tfoot td.num { text-align: center; }
+.grid-table tfoot td.right-num { text-align: right; padding-right: 6px; }
 .grid-table th .day-date {
   display: block;
   font-family: var(--font-mono);
