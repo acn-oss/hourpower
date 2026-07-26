@@ -149,6 +149,28 @@ function friendlyAuthError(err) {
   return map[err.code] || err.message;
 }
 
+$('forgotPasswordBtn').addEventListener('click', async () => {
+  const email = $('loginEmail').value.trim();
+  const msg = $('forgotMsg');
+  if (!email) {
+    msg.textContent = 'Enter your email address above first, then click "Forgot password?".';
+    msg.style.color = 'var(--stamp)';
+    msg.classList.remove('hidden');
+    return;
+  }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    msg.textContent = `Reset link sent to ${email} — check your inbox (and spam folder).`;
+    msg.style.color = 'var(--accent-dark)';
+  } catch (err) {
+    msg.textContent = err.code === 'auth/user-not-found'
+      ? 'No account found with that email address.'
+      : err.message;
+    msg.style.color = 'var(--danger)';
+  }
+  msg.classList.remove('hidden');
+});
+
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   $('authError').classList.add('hidden');
