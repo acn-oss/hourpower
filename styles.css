@@ -14,9 +14,9 @@
   --stamp: #B5712F;
   --danger: #A33B2E;
   --radius: 6px;
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
-  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --font-display: 'MetronicPro', sans-serif;
+  --font-body: 'MetronicPro', sans-serif;
+  --font-mono: 'MetronicPro', sans-serif;
   --shadow: 0 1px 2px rgba(28,42,46,0.06), 0 4px 14px rgba(28,42,46,0.07);
 }
 
@@ -290,6 +290,19 @@ input, select, textarea {
   border-radius: 3px;
   margin-right: 7px;
   vertical-align: 1px;
+}
+
+.ledger-table .num,
+.total-pill,
+.week-label,
+.proj-code,
+.row-total,
+.summary-value,
+.rate-input,
+.grid-table input[type="number"],
+.grid-table tfoot,
+.app-footer {
+  font-weight: 300;
 }
 
 .form-actions { display: flex; gap: 10px; margin-top: 4px; }
