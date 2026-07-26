@@ -630,25 +630,37 @@ function renderProjectTotals() {
 $('totalsProjectSelect').addEventListener('change', renderProjectTotals);
 
 function renderFilterProjectSelect() {
+  // Sort projects by code descending (highest first) for the dropdowns
+  const sortedProjects = [...projectsCache].sort((a, b) => {
+    const codeA = a.code || '';
+    const codeB = b.code || '';
+    if (codeA && codeB) return codeB.localeCompare(codeA);
+    if (codeA) return -1;
+    if (codeB) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const projectOptions = (items) => items.map(p =>
+    `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('');
+
+  // All entries filter — Projects first, then ADM/AQ/INT
   const filterSel = $('filterProject');
   const filterCurrent = filterSel.value;
   filterSel.innerHTML = '<option value="">All items</option>';
+  if (sortedProjects.length) {
+    filterSel.innerHTML += `<optgroup label="Projects">${projectOptions(sortedProjects)}</optgroup>`;
+  }
   EXTRA_TYPES.forEach(({ type, label }) => {
     if (extraCache[type].length) {
-      filterSel.innerHTML += `<optgroup label="${label}">${extraCache[type].map(p =>
-        `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('')}</optgroup>`;
+      filterSel.innerHTML += `<optgroup label="${label}">${projectOptions(extraCache[type])}</optgroup>`;
     }
   });
-  if (projectsCache.length) {
-    filterSel.innerHTML += `<optgroup label="Projects">${projectsCache.map(p =>
-      `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('')}</optgroup>`;
-  }
   filterSel.value = filterCurrent;
 
+  // Project totals — Projects only, sorted descending
   const totalsSel = $('totalsProjectSelect');
   const totalsCurrent = totalsSel.value;
-  totalsSel.innerHTML = '<option value="">Choose a project…</option>' +
-    projectsCache.map(p => `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('');
+  totalsSel.innerHTML = '<option value="">Choose a project…</option>' + projectOptions(sortedProjects);
   totalsSel.value = totalsCurrent;
 }
 
