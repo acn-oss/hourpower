@@ -1148,7 +1148,7 @@ function renderWeekGrid() {
     }, 0)
   );
   const grandTotal = dayTotals.reduce((s, n) => s + n, 0);
-  $('weekGridFoot').innerHTML = `<tr class="totals-row"><td>Total</td>` +
+  $('weekGridFoot').innerHTML = `<tr class="totals-row"><td colspan="2">Total</td>` +
     dayTotals.map((t, i) => `<td class="num ${i >= 5 ? 'weekend' : ''}">${trimZeros(t)}</td>`).join('') +
     `<td class="num">${trimZeros(grandTotal)}</td></tr>`;
 }
