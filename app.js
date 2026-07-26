@@ -4,6 +4,24 @@
 // settings live in config.js.
 // ============================================================
 
+// Show the last-modified date of this file in the page footer.
+// Updates automatically whenever app.js is re-uploaded to GitHub.
+(async () => {
+  try {
+    const res = await fetch('app.js', { method: 'HEAD', cache: 'no-cache' });
+    const lastMod = res.headers.get('last-modified');
+    const el = document.getElementById('appUpdateNotice');
+    if (el && lastMod) {
+      const d = new Date(lastMod);
+      const formatted = d.toLocaleString('da-DK', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+      el.textContent = `Last app update: ${formatted}`;
+    }
+  } catch { /* silently ignore if fetch fails */ }
+})();
+
 const $ = (id) => document.getElementById(id);
 
 // ---- Setup check -------------------------------------------------

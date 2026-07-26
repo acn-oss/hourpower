@@ -715,3 +715,17 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   color: var(--ink);
   font-family: var(--font-body);
 }
+
+/* ==========================================================
+   App footer — last update notice
+   ========================================================== */
+.app-footer {
+  text-align: center;
+  padding: 14px 20px;
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--line-soft);
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
