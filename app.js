@@ -141,7 +141,7 @@ function friendlyAuthError(err) {
   const map = {
     'auth/email-already-in-use': "That email already has an account — try signing in instead.",
     'auth/invalid-email': "That email address doesn't look right.",
-    'auth/weak-password': 'Password needs to be at least 6 characters.',
+    'auth/weak-password': 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character (e.g. !, @, #).',
     'auth/wrong-password': 'Wrong password.',
     'auth/user-not-found': 'No account with that email yet.',
     'auth/invalid-credential': 'Email or password is incorrect.'
