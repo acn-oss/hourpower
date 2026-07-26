@@ -1222,7 +1222,7 @@ $('weekGridBody').addEventListener('change', async (e) => {
 });
 
 function trimZeros(n) {
-  return n.toFixed(2).replace(/\.?0+$/, '') || '0';
+  return (n.toFixed(2).replace(/\.?0+$/, '') || '0').replace('.', ',');
 }
 
 // ============================================================
