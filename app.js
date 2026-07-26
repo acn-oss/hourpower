@@ -1111,7 +1111,7 @@ function renderWeekGrid() {
     `<th class="sortable-th${userSortKey==='code'?' sort-active':''}" data-user-sort="code">No.${sortArrow('code')}</th>` +
     `<th class="sortable-th${userSortKey==='name'?' sort-active':''}" data-user-sort="name">Project${sortArrow('name')}</th>` +
     weekDates.map((d, i) => `<th class="num ${i >= 5 ? 'weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth() + 1}</span></th>`).join('') +
-    '<th class="num">Total week</th>' +
+    '<th class="num">Total<span class="day-date">week</span></th>' +
     '<th class="num">Total</th>';
 
   const sortItems = (items) => [...items].sort((a, b) => {
@@ -1172,9 +1172,9 @@ function renderWeekGrid() {
   const grandTotalWeek = dayTotals.reduce((s, n) => s + n, 0);
   const grandTotalAll = allVisible.reduce((sum, p) => sum + allHoursForProject(p.id), 0);
   $('weekGridFoot').innerHTML = `<tr class="totals-row"><td colspan="2">Total</td>` +
-    dayTotals.map((t, i) => `<td class="num right-num ${i >= 5 ? 'weekend' : ''}">${trimZeros(t)}</td>`).join('') +
-    `<td class="num right-num">${trimZeros(grandTotalWeek)}</td>` +
-    `<td class="num right-num">${trimZeros(grandTotalAll)}</td></tr>`;
+    dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
+    `<td><span class="foot-num">${trimZeros(grandTotalWeek)}</span></td>` +
+    `<td><span class="foot-num">${trimZeros(grandTotalAll)}</span></td></tr>`;
 }
 
 $('weekGridBody').addEventListener('change', async (e) => {
