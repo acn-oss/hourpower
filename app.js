@@ -1309,6 +1309,7 @@ makeToggle('allEntriesToggle', 'allEntriesBody', 'allEntriesChevron');
 makeToggle('weekOverviewToggle', 'weekOverviewBody', 'weekOverviewChevron');
 makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
 makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
+makeToggle('rateLineToggle', 'rateLinesSections', 'rateLineChevron');
 makeToggle('archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron');
 
 $('ratesTable').addEventListener('click', async (e) => {

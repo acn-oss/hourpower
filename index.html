@@ -141,8 +141,11 @@
           </div>
 
           <div class="rate-lines-section">
-            <p class="access-intro">Project-specific rates <span class="optional">optional — per employee, overrides their standard rate from each "used from" date onward (including past hours). Leave rows blank to fall back to the employee's standard rate.</span></p>
-            <div id="rateLinesSections"></div>
+            <div class="card-header-row card-toggle" id="rateLineToggle" role="button" tabindex="0" aria-expanded="false" style="margin-bottom:0;padding:6px 0;cursor:pointer">
+              <span class="access-intro" style="margin:0;color:var(--ink-soft)">Project-specific rates <span class="optional">per employee — overrides their standard rate from each "used from" date</span></span>
+              <span class="chevron collapsed" id="rateLineChevron">▾</span>
+            </div>
+            <div id="rateLinesSections" class="hidden" style="margin-top:10px"></div>
           </div>
 
           <div class="form-actions">
