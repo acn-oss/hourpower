@@ -1371,7 +1371,7 @@ function renderWeekGrid() {
     `<th class="sortable-th${userSortKey==='name'?' sort-active':''}" data-user-sort="name">Project${sortArrow('name')}</th>` +
     weekDates.map((d, i) => `<th class="num ${i >= 5 ? 'weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth() + 1}</span></th>`).join('') +
     '<th class="num">Total<span class="day-date">week</span></th>' +
-    '<th class="num">Total</th>';
+    '<th class="num">Total<span class="day-date">YTD</span></th>';
 
   const sortItems = (items) => [...items].sort((a, b) => {
     const va = (a[userSortKey] || '').toLowerCase();
@@ -1390,8 +1390,12 @@ function renderWeekGrid() {
   $('weekGridTable').classList.toggle('hidden', !hasItems);
 
   const entryFor = (projectId, date) => userEntriesCache.find(en => en.projectId === projectId && en.date === date);
-  const allHoursForProject = (projectId) => userEntriesCache.filter(en => en.projectId === projectId).reduce((s, en) => s + en.hours, 0);
-  const colspan = 11; // No. + Project + 7 days + Total week + Total
+  const yearStart = `${new Date().getFullYear()}-01-01`;
+  const todayStr  = toISODate(new Date());
+  const ytdHoursForProject = (projectId) => userEntriesCache
+    .filter(en => en.projectId === projectId && en.date >= yearStart && en.date <= todayStr)
+    .reduce((s, en) => s + en.hours, 0);
+  const colspan = 11;
 
   const renderSection = (items, label) => {
     if (!items.length) return '';
@@ -1405,13 +1409,13 @@ function renderWeekGrid() {
         return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
           data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
       }).join('');
-      const overallTotal = allHoursForProject(p.id);
+      const ytd = ytdHoursForProject(p.id);
       return `<tr>
         <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
         <td>${escapeHtml(p.name)}</td>
         ${cells}
         <td class="num row-total">${trimZeros(rowTotal)}</td>
-        <td class="num row-total">${trimZeros(overallTotal)}</td>
+        <td class="num row-total">${trimZeros(ytd)}</td>
       </tr>`;
     }).join('');
     return header + rows;
@@ -1429,11 +1433,11 @@ function renderWeekGrid() {
     }, 0)
   );
   const grandTotalWeek = dayTotals.reduce((s, n) => s + n, 0);
-  const grandTotalAll = allVisible.reduce((sum, p) => sum + allHoursForProject(p.id), 0);
+  const grandTotalYTD  = allVisible.reduce((sum, p) => sum + ytdHoursForProject(p.id), 0);
   $('weekGridFoot').innerHTML = `<tr class="totals-row"><td colspan="2">Total</td>` +
     dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
     `<td><span class="foot-num">${trimZeros(grandTotalWeek)}</span></td>` +
-    `<td><span class="foot-num">${trimZeros(grandTotalAll)}</span></td></tr>`;
+    `<td><span class="foot-num">${trimZeros(grandTotalYTD)}</span></td></tr>`;
 
   // Flex / Difference / Balance rows — permanent position employees only
   if (currentUser.employeeType === '2') {
@@ -1445,38 +1449,46 @@ function renderWeekGrid() {
         if (!sign) return s;
         return v > 0 ? `+${s}` : v < 0 ? `−${s}` : s;
       };
+      const fn = (v, sign = false, cls = '') =>
+        `<span class="foot-num${cls ? ' ' + cls : ''}">${fmt(v, sign)}</span>`;
 
-      // Balance at end of the day before the week starts
       const prevDayStr = toISODate(addDays(weekStart, -1));
       let balance = computeBalance(prevDayStr, schedule, userEntriesCache) || 0;
 
       const flexCells = [], diffCells = [], balCells = [];
+      let flexWeekTotal = 0, diffWeekTotal = 0;
       const today = toISODate(new Date());
+
       for (let i = 0; i < 7; i++) {
         const ds = dateStrs[i];
         const flex = getFlexHours(ds, schedule);
         const logged = dayTotals[i];
         const diff = flex !== null ? logged - flex : null;
-        if (diff !== null) balance += diff;
+        if (diff !== null) { balance += diff; flexWeekTotal += flex; diffWeekTotal += diff; }
         const isWE = i >= 5;
         const isFuture = ds > today;
-        flexCells.push(`<td class="${isWE ? 'weekend' : ''} flex-cell">${fmt(flex)}</td>`);
-        diffCells.push(`<td class="${isWE ? 'weekend' : ''} diff-cell ${diff !== null && diff < 0 ? 'neg' : ''}">${fmt(diff, true)}</td>`);
-        balCells.push(`<td class="${isWE ? 'weekend' : ''} diff-cell ${!isFuture && balance < 0 ? 'neg' : ''}">${flex !== null && !isFuture ? fmt(balance, true) : '<span class="flex-na">–</span>'}</td>`);
+        flexCells.push(`<td class="${isWE ? 'weekend' : ''}">${fn(flex)}</td>`);
+        diffCells.push(`<td class="${isWE ? 'weekend' : ''}">${fn(diff, true, diff !== null && diff < 0 ? 'neg' : '')}</td>`);
+        balCells.push(`<td class="${isWE ? 'weekend' : ''}">${flex !== null && !isFuture ? fn(balance, true, balance < 0 ? 'neg' : '') : '<span class="flex-na">–</span>'}</td>`);
       }
 
       $('weekGridFoot').innerHTML += `
-        <tr class="flex-row">
+        <tr class="flex-row top-spaced">
           <td colspan="2" class="flex-label">Flex</td>
-          ${flexCells.join('')}<td></td><td></td>
+          ${flexCells.join('')}
+          <td>${fn(flexWeekTotal)}</td>
+          <td></td>
         </tr>
         <tr class="flex-row diff">
           <td colspan="2" class="flex-label">Difference</td>
-          ${diffCells.join('')}<td></td><td></td>
+          ${diffCells.join('')}
+          <td>${fn(diffWeekTotal, true, diffWeekTotal < 0 ? 'neg' : '')}</td>
+          <td></td>
         </tr>
         <tr class="flex-row balance">
           <td colspan="2" class="flex-label">Balance</td>
-          ${balCells.join('')}<td></td><td></td>
+          ${balCells.join('')}
+          <td></td><td></td>
         </tr>`;
     }
   }
