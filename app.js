@@ -484,10 +484,26 @@ function renderRatesTable() {
     tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No active employees yet.</td></tr>`;
     return;
   }
-  const typeOptions = EMPLOYEE_TYPES.map(t =>
-    `<option value="${t.value}">${escapeHtml(t.label)}</option>`).join('');
   tbody.innerHTML = allUsersCache.map(u => {
     const r = ratesCache[u.uid] || {};
+    const isPermanent = u.employeeType === '2';
+    const schedule = (u.workWeekSchedule || []);
+
+    const scheduleRows = isPermanent ? `
+    <tr class="work-week-row">
+      <td colspan="5">
+        <div class="work-week-section">
+          <div class="work-week-header">
+            <span class="work-week-label">Working week schedule</span>
+            <button type="button" class="btn btn-ghost btn-sm add-work-week" data-uid="${u.uid}">+ Add</button>
+          </div>
+          <div class="work-week-lines" id="wwlines-${u.uid}">
+            ${renderWorkWeekLines(u.uid, schedule)}
+          </div>
+        </div>
+      </td>
+    </tr>` : '';
+
     return `
     <tr>
       <td><input type="text" class="rate-name-input" data-uid="${u.uid}" data-field="name" value="${escapeHtml(u.name)}" /></td>
@@ -505,8 +521,21 @@ function renderRatesTable() {
       <td class="row-actions">
         <button class="link-btn" data-archive-user="${u.uid}">Archive</button>
       </td>
-    </tr>`;
+    </tr>${scheduleRows}`;
   }).join('');
+}
+
+function renderWorkWeekLines(uid, schedule) {
+  if (!schedule.length) {
+    return `<p class="work-week-empty">No schedule yet — click + Add to set a working week.</p>`;
+  }
+  return schedule.map((s, i) => `
+    <div class="work-week-line">
+      <input type="date" class="ww-date" data-uid="${uid}" data-idx="${i}" value="${s.from || ''}" />
+      <input type="number" min="0" max="60" step="0.5" class="ww-hours rate-input" data-uid="${uid}" data-idx="${i}" value="${s.hours ?? ''}" placeholder="hrs/week" />
+      <span class="ww-unit">hrs/week</span>
+      <button type="button" class="link-btn link-danger ww-remove" data-uid="${uid}" data-idx="${i}">×</button>
+    </div>`).join('');
 }
 
 function renderArchivedUsersTable() {
@@ -524,7 +553,57 @@ function renderArchivedUsersTable() {
     </tr>`).join('');
 }
 
+async function saveWorkWeekSchedule(uid) {
+  const u = allUsersCache.find(x => x.uid === uid);
+  if (!u) return;
+  const lines = $(`wwlines-${uid}`);
+  if (!lines) return;
+  const schedule = (u.workWeekSchedule || []).map((s, i) => {
+    const dateEl = lines.querySelector(`.ww-date[data-idx="${i}"]`);
+    const hoursEl = lines.querySelector(`.ww-hours[data-idx="${i}"]`);
+    return {
+      from: dateEl ? dateEl.value : s.from,
+      hours: hoursEl && hoursEl.value !== '' ? parseFloat(hoursEl.value) : s.hours
+    };
+  }).filter(s => s.from);
+  schedule.sort((a, b) => a.from.localeCompare(b.from));
+  await db.collection('users').doc(uid).update({ workWeekSchedule: schedule });
+  u.workWeekSchedule = schedule;
+  showStamp('Saved');
+}
+
+$('ratesTable').addEventListener('click', async (e) => {
+  // + Add working week row
+  if (e.target.classList.contains('add-work-week')) {
+    const uid = e.target.dataset.uid;
+    const u = allUsersCache.find(x => x.uid === uid);
+    if (!u) return;
+    u.workWeekSchedule = [...(u.workWeekSchedule || []), { from: '', hours: '' }];
+    const lines = document.getElementById(`wwlines-${uid}`);
+    if (lines) lines.innerHTML = renderWorkWeekLines(uid, u.workWeekSchedule);
+  }
+
+  // × Remove working week row
+  if (e.target.classList.contains('ww-remove')) {
+    const uid = e.target.dataset.uid;
+    const idx = parseInt(e.target.dataset.idx);
+    const u = allUsersCache.find(x => x.uid === uid);
+    if (!u) return;
+    u.workWeekSchedule = (u.workWeekSchedule || []).filter((_, i) => i !== idx);
+    await db.collection('users').doc(uid).update({ workWeekSchedule: u.workWeekSchedule });
+    const lines = document.getElementById(`wwlines-${uid}`);
+    if (lines) lines.innerHTML = renderWorkWeekLines(uid, u.workWeekSchedule);
+    showStamp('Saved');
+  }
+});
+
 $('ratesTable').addEventListener('change', async (e) => {
+  // Working week date or hours changed
+  if (e.target.classList.contains('ww-date') || e.target.classList.contains('ww-hours')) {
+    const uid = e.target.dataset.uid;
+    await saveWorkWeekSchedule(uid);
+    return;
+  }
   // Rate inputs (salesRate / costRate)
   if (e.target.matches('input[data-rate-uid]')) {
     const input = e.target;
@@ -553,10 +632,12 @@ $('ratesTable').addEventListener('change', async (e) => {
       await db.collection('users').doc(uid).update({ employeeType });
       const u = allUsersCache.find(x => x.uid === uid);
       if (u) u.employeeType = employeeType;
+      renderRatesTable(); // re-render to show/hide work week section
       showStamp('Saved');
     } catch (err) {
       alert('Could not save employee type: ' + err.message);
     }
+    return;
   }
 });
 

@@ -792,3 +792,53 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   min-width: 180px;
 }
 .rate-type-select:hover { border-color: var(--accent); }
+
+/* ==========================================================
+   Working week schedule (Permanent position employees)
+   ========================================================== */
+.work-week-row td { padding: 0 0 10px 10px; border-bottom: none; }
+.work-week-section {
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 6px;
+}
+.work-week-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.work-week-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+.btn-sm { padding: 4px 10px; font-size: 0.78rem; }
+.work-week-empty {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.work-week-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.work-week-line:last-child { margin-bottom: 0; }
+.ww-date {
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.83rem;
+  background: #fff;
+  color: var(--ink);
+  width: 142px;
+}
+.ww-hours { width: 72px; }
+.ww-unit {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
