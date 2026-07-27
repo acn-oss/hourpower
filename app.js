@@ -540,10 +540,8 @@ $('ratesTable').addEventListener('change', async (e) => {
   if (e.target.matches('select[data-uid]')) {
     const uid = e.target.dataset.uid;
     const employeeType = e.target.value;
-    // Partners are editors; all other types are regular users
-    const role = employeeType === '1' ? 'editor' : 'user';
     try {
-      await db.collection('users').doc(uid).update({ employeeType, role });
+      await db.collection('users').doc(uid).update({ employeeType });
       const u = allUsersCache.find(x => x.uid === uid);
       if (u) u.employeeType = employeeType;
       showStamp('Saved');
