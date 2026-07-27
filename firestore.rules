@@ -17,12 +17,10 @@ service cloud.firestore {
     }
 
     function isEditor() {
-      return isSignedIn() && (
+      return isSignedIn() &&
         request.auth.token.email in [
           'you@example.com'
-        ] ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'editor'
-      );
+        ];
     }
 
     // Each user's own profile doc (name, email, role)

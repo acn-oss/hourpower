@@ -393,7 +393,8 @@ function projectLabelText(p) {
 
 function listenAllUsers() {
   allUsersUnsub = db.collection('users').orderBy('name').onSnapshot((snap) => {
-    const all = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.role !== 'editor');
+    const all = snap.docs.map(d => ({ uid: d.id, ...d.data() }))
+      .filter(u => u.uid !== currentUser.uid); // exclude only the currently logged-in admin
     allUsersCache = all.filter(u => u.active !== false);
     archivedUsersCache = all.filter(u => u.active === false);
     renderProjectsTable();
