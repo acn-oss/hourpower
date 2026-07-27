@@ -126,15 +126,15 @@ function isoWeekNumber(date) {
 // rate  = monthly accrual for the current month's schedule
 // ytd   = earned Jan 1 – end of last completed month (this calendar year)
 // total = earned since schedule started – end of last completed month
-function calcVacation(schedule) {
+function calcVacation(schedule, referenceDate) {
   if (!schedule || !schedule.length) return { rate: 0, ytd: 0, total: 0 };
   const KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const scheduleStart = schedule.reduce((min, s) => s.from < min ? s.from : min, schedule[0].from);
-  const today = new Date();
+  const ref = referenceDate || new Date();
 
-  // Last completed month = end of the month before this one
-  const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-  const yearStart    = new Date(today.getFullYear(), 0, 1);
+  // Last completed month = end of the month before the reference date's month
+  const lastMonthEnd = new Date(ref.getFullYear(), ref.getMonth(), 0);
+  const yearStart    = new Date(ref.getFullYear(), 0, 1);
 
   // Weekly hours from a schedule entry
   const weeklyHrs = (entry) => {
@@ -176,8 +176,8 @@ function calcVacation(schedule) {
     m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
   }
 
-  // Current rate (for display)
-  const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  // Current rate (for display — based on the month of the reference date)
+  const currentMonthStr = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}-01`;
   const rate = monthlyRate(currentMonthStr);
 
   return { rate, ytd, total };
@@ -1551,7 +1551,7 @@ function renderWeekGrid() {
         </tr>`;
 
       // Vacation rows
-      const vac = calcVacation(schedule);
+      const vac = calcVacation(schedule, addDays(weekStart, 6));
       const fmtDays = (d) => `${trimZeros(Math.round(d * 100) / 100)} d`;
       const empty7 = dateStrs.map((_, i) => `<td class="${i >= 5 ? 'weekend' : ''}"></td>`).join('');
       $('weekGridFoot').innerHTML += `
