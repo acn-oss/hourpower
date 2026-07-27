@@ -1421,6 +1421,7 @@ function renderWeekGrid() {
       let balance = computeBalance(prevDayStr, schedule, userEntriesCache) || 0;
 
       const flexCells = [], diffCells = [], balCells = [];
+      const today = toISODate(new Date());
       for (let i = 0; i < 7; i++) {
         const ds = dateStrs[i];
         const flex = getFlexHours(ds, schedule);
@@ -1428,9 +1429,10 @@ function renderWeekGrid() {
         const diff = flex !== null ? logged - flex : null;
         if (diff !== null) balance += diff;
         const isWE = i >= 5;
+        const isFuture = ds > today;
         flexCells.push(`<td class="${isWE ? 'weekend' : ''} flex-cell">${fmt(flex)}</td>`);
         diffCells.push(`<td class="${isWE ? 'weekend' : ''} diff-cell ${diff !== null && diff < 0 ? 'neg' : ''}">${fmt(diff, true)}</td>`);
-        balCells.push(`<td class="${isWE ? 'weekend' : ''} diff-cell ${balance < 0 ? 'neg' : ''}">${flex !== null ? fmt(balance, true) : '<span class="flex-na">–</span>'}</td>`);
+        balCells.push(`<td class="${isWE ? 'weekend' : ''} diff-cell ${!isFuture && balance < 0 ? 'neg' : ''}">${flex !== null && !isFuture ? fmt(balance, true) : '<span class="flex-na">–</span>'}</td>`);
       }
 
       $('weekGridFoot').innerHTML += `
