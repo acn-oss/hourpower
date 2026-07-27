@@ -460,17 +460,34 @@ function listenRates() {
   });
 }
 
+const EMPLOYEE_TYPES = [
+  { value: '',  label: '— Select type —' },
+  { value: '1', label: '1 Partner' },
+  { value: '2', label: '2 Permanent position' },
+  { value: '3', label: '3 Freelance position' },
+  { value: '4', label: '4 Intern position' }
+];
+
 function renderRatesTable() {
   const tbody = $('ratesTable').querySelector('tbody');
   if (!allUsersCache.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No active employees yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No active employees yet.</td></tr>`;
     return;
   }
+  const typeOptions = EMPLOYEE_TYPES.map(t =>
+    `<option value="${t.value}">${escapeHtml(t.label)}</option>`).join('');
   tbody.innerHTML = allUsersCache.map(u => {
     const r = ratesCache[u.uid] || {};
     return `
     <tr>
-      <td>${escapeHtml(u.name)}</td>
+      <td><input type="text" class="rate-name-input" data-uid="${u.uid}" data-field="name" value="${escapeHtml(u.name)}" /></td>
+      <td>
+        <select class="rate-type-select" data-uid="${u.uid}">
+          ${EMPLOYEE_TYPES.map(t =>
+            `<option value="${t.value}"${u.employeeType === t.value ? ' selected' : ''}>${escapeHtml(t.label)}</option>`
+          ).join('')}
+        </select>
+      </td>
       <td class="num"><input type="number" min="0" step="1" class="rate-input"
         data-rate-uid="${u.uid}" data-rate-field="salesRate" value="${r.salesRate ?? ''}" /></td>
       <td class="num"><input type="number" min="0" step="1" class="rate-input"
@@ -498,34 +515,55 @@ function renderArchivedUsersTable() {
 }
 
 $('ratesTable').addEventListener('change', async (e) => {
-  const input = e.target;
-  if (!(input.matches && input.matches('input[data-rate-uid]'))) return;
-
-  const uid = input.dataset.rateUid;
-  const field = input.dataset.rateField;
-  const raw = input.value.trim();
-  if (raw !== '' && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) {
-    input.value = '';
-    return;
+  // Rate inputs (salesRate / costRate)
+  if (e.target.matches('input[data-rate-uid]')) {
+    const input = e.target;
+    const uid = input.dataset.rateUid;
+    const field = input.dataset.rateField;
+    const raw = input.value.trim();
+    if (raw !== '' && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) { input.value = ''; return; }
+    const value = raw === '' ? 0 : parseFloat(raw);
+    input.disabled = true;
+    try {
+      await db.collection('rates').doc(uid).set({ [field]: value }, { merge: true });
+      showStamp('Saved');
+    } catch (err) {
+      alert('That rate didn\'t save.\n\n' + (err.code === 'permission-denied'
+        ? 'Firestore rules need updating — repaste firestore.rules into Firebase Console → Databases & Storage → Firestore → Rules → Publish.'
+        : err.message));
+      input.value = '';
+    } finally { input.disabled = false; }
   }
-  const value = raw === '' ? 0 : parseFloat(raw);
 
-  input.disabled = true;
-  try {
-    await db.collection('rates').doc(uid).set({ [field]: value }, { merge: true });
-    showStamp('Saved');
-  } catch (err) {
-    alert(
-      "That rate didn't save.\n\n" +
-      (err.code === 'permission-denied'
-        ? "This usually means the Firestore security rules haven't been updated yet for the rates feature — repaste firestore.rules into Firebase Console → Databases & Storage → Firestore → Rules → Publish."
-        : err.message)
-    );
-    input.value = '';
-  } finally {
-    input.disabled = false;
+  // Employee type dropdown
+  if (e.target.matches('select[data-uid]')) {
+    const uid = e.target.dataset.uid;
+    const employeeType = e.target.value;
+    try {
+      await db.collection('users').doc(uid).update({ employeeType });
+      showStamp('Saved');
+    } catch (err) {
+      alert('Could not save employee type: ' + err.message);
+    }
   }
 });
+
+$('ratesTable').addEventListener('blur', async (e) => {
+  // Editable name field
+  if (!e.target.matches('input[data-field="name"]')) return;
+  const uid = e.target.dataset.uid;
+  const name = e.target.value.trim();
+  if (!name) { e.target.value = allUsersCache.find(u => u.uid === uid)?.name || ''; return; }
+  try {
+    await db.collection('users').doc(uid).update({ name });
+    // Update local cache so other renders reflect the new name
+    const u = allUsersCache.find(x => x.uid === uid);
+    if (u) u.name = name;
+    showStamp('Saved');
+  } catch (err) {
+    alert('Could not save name: ' + err.message);
+  }
+}, true); // useCapture=true so blur fires on the input inside the table
 
 function formatDkk(n) {
   return n.toLocaleString('da-DK', { maximumFractionDigits: 0 }) + ' kr.';

@@ -768,3 +768,27 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   color: var(--accent-dark);
   margin: 0 0 8px;
 }
+
+.rate-name-input {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 9px;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  background: #fff;
+  color: var(--ink);
+  width: 160px;
+}
+.rate-name-input:hover { border-color: var(--accent); }
+
+.rate-type-select {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-family: var(--font-body);
+  font-size: 0.83rem;
+  background: #fff;
+  color: var(--ink);
+  min-width: 180px;
+}
+.rate-type-select:hover { border-color: var(--accent); }
