@@ -223,7 +223,7 @@ signupForm.addEventListener('submit', async (e) => {
   try {
     const cred = await auth.createUserWithEmailAndPassword(email, password);
     await cred.user.updateProfile({ displayName: name });
-    // Always role: user — editors are promoted manually in Firestore
+    // Always role: user on self-signup — editors are defined by EDITOR_EMAILS in config.js
     await db.collection('users').doc(cred.user.uid).set({
       name, email, role: 'user',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -300,7 +300,16 @@ auth.onAuthStateChanged(async (user) => {
   }
 
   const data = userDoc.data();
-  currentUser = { uid: user.uid, name: data.name, email: data.email, role: data.role };
+
+  // Role is determined by email — this overrides anything stored in Firestore,
+  // which self-corrects any accidentally promoted accounts.
+  const correctRole = EDITOR_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase())
+    ? 'editor' : 'user';
+  if (data.role !== correctRole) {
+    await db.collection('users').doc(user.uid).update({ role: correctRole });
+  }
+
+  currentUser = { uid: user.uid, name: data.name, email: data.email, role: correctRole };
 
   $('authScreen').classList.add('hidden');
   $('verifyScreen').classList.add('hidden');
