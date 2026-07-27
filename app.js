@@ -129,14 +129,20 @@ function getFlexHours(dateStr, schedule) {
   const scheduleStart = schedule.reduce((min, s) => s.from < min ? s.from : min, schedule[0].from);
   if (dateStr < scheduleStart) return null;
   const dow = new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun 6=Sat
-  if (dow === 0 || dow === 6) return 0;
   let applicable = null;
   for (const entry of schedule) {
     if (entry.from <= dateStr && (!applicable || entry.from > applicable.from)) {
       applicable = entry;
     }
   }
-  return applicable ? applicable.hours / 5 : 0;
+  if (!applicable) return 0;
+  // New format: individual day hours
+  const KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const dayKey = KEYS[dow];
+  if (applicable[dayKey] !== undefined) return applicable[dayKey] || 0;
+  // Legacy format: hours/week divided evenly Mon–Fri
+  if (dow === 0 || dow === 6) return 0;
+  return applicable.hours ? applicable.hours / 5 : 0;
 }
 
 // Returns the cumulative flex balance from the schedule start up to and including targetDateStr.
@@ -574,16 +580,29 @@ function renderRatesTable() {
 }
 
 function renderWorkWeekLines(uid, schedule) {
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   if (!schedule.length) {
     return `<p class="work-week-empty">No schedule yet — click + Add to set a working week.</p>`;
   }
-  return schedule.map((s, i) => `
-    <div class="work-week-line">
-      <input type="date" class="ww-date" data-uid="${uid}" data-idx="${i}" value="${s.from || ''}" />
-      <input type="number" min="0" max="60" step="0.5" class="ww-hours rate-input" data-uid="${uid}" data-idx="${i}" value="${s.hours ?? ''}" placeholder="hrs/week" />
-      <span class="ww-unit">hrs/week</span>
-      <button type="button" class="link-btn link-danger ww-remove" data-uid="${uid}" data-idx="${i}">×</button>
-    </div>`).join('');
+  return schedule.map((s, i) => {
+    const total = KEYS.reduce((sum, k) => sum + (parseFloat(s[k]) || 0), 0);
+    const dayInputs = KEYS.map((k, di) => `
+      <label class="ww-day-label">${DAYS[di]}
+        <input type="number" min="0" max="24" step="0.5" class="ww-day rate-input"
+          data-uid="${uid}" data-idx="${i}" data-day="${k}"
+          value="${s[k] != null ? s[k] : ''}" placeholder="0" />
+      </label>`).join('');
+    return `
+      <div class="work-week-line">
+        <div class="ww-row-top">
+          <input type="date" class="ww-date" data-uid="${uid}" data-idx="${i}" value="${s.from || ''}" />
+          <span class="ww-total-label">= <strong class="ww-total" id="wwtotal-${uid}-${i}">${trimZeros(total)}</strong> hrs/week</span>
+          <button type="button" class="link-btn link-danger ww-remove" data-uid="${uid}" data-idx="${i}">×</button>
+        </div>
+        <div class="ww-days-row">${dayInputs}</div>
+      </div>`;
+  }).join('');
 }
 
 function renderArchivedUsersTable() {
@@ -604,19 +623,27 @@ function renderArchivedUsersTable() {
 async function saveWorkWeekSchedule(uid) {
   const u = allUsersCache.find(x => x.uid === uid);
   if (!u) return;
-  const lines = $(`wwlines-${uid}`);
+  const lines = document.getElementById(`wwlines-${uid}`);
   if (!lines) return;
+  const KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const schedule = (u.workWeekSchedule || []).map((s, i) => {
     const dateEl = lines.querySelector(`.ww-date[data-idx="${i}"]`);
-    const hoursEl = lines.querySelector(`.ww-hours[data-idx="${i}"]`);
-    return {
-      from: dateEl ? dateEl.value : s.from,
-      hours: hoursEl && hoursEl.value !== '' ? parseFloat(hoursEl.value) : s.hours
-    };
+    const entry = { from: dateEl ? dateEl.value : s.from };
+    KEYS.forEach(k => {
+      const el = lines.querySelector(`.ww-day[data-idx="${i}"][data-day="${k}"]`);
+      entry[k] = el && el.value !== '' ? parseFloat(el.value) : (s[k] || 0);
+    });
+    // Update the live total label
+    const total = KEYS.reduce((sum, k) => sum + (entry[k] || 0), 0);
+    const totalEl = document.getElementById(`wwtotal-${uid}-${i}`);
+    if (totalEl) totalEl.textContent = trimZeros(total);
+    return entry;
   }).filter(s => s.from);
   schedule.sort((a, b) => a.from.localeCompare(b.from));
   await db.collection('users').doc(uid).update({ workWeekSchedule: schedule });
   u.workWeekSchedule = schedule;
+  // Also update currentUser if this is the logged-in user (editor editing themselves)
+  if (currentUser && currentUser.uid === uid) currentUser.workWeekSchedule = schedule;
   showStamp('Saved');
 }
 
@@ -626,7 +653,7 @@ $('ratesTable').addEventListener('click', async (e) => {
     const uid = e.target.dataset.uid;
     const u = allUsersCache.find(x => x.uid === uid);
     if (!u) return;
-    u.workWeekSchedule = [...(u.workWeekSchedule || []), { from: '', hours: '' }];
+    u.workWeekSchedule = [...(u.workWeekSchedule || []), { from: '', mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 }];
     const lines = document.getElementById(`wwlines-${uid}`);
     if (lines) lines.innerHTML = renderWorkWeekLines(uid, u.workWeekSchedule);
   }
@@ -646,8 +673,8 @@ $('ratesTable').addEventListener('click', async (e) => {
 });
 
 $('ratesTable').addEventListener('change', async (e) => {
-  // Working week date or hours changed
-  if (e.target.classList.contains('ww-date') || e.target.classList.contains('ww-hours')) {
+  // Working week date or day hours changed
+  if (e.target.classList.contains('ww-date') || e.target.classList.contains('ww-day')) {
     const uid = e.target.dataset.uid;
     await saveWorkWeekSchedule(uid);
     return;

@@ -867,3 +867,32 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 .diff-cell { }
 .diff-cell.neg { color: var(--danger); }
 .flex-na { color: var(--line); }
+
+.ww-row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.ww-total-label {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.ww-total { color: var(--accent-dark); }
+.ww-days-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ww-day-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ww-day-label input { width: 46px; text-align: center; }
