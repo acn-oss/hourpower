@@ -1,13 +1,15 @@
 // ============================================================
 // Paste your Firebase project config below.
 // ============================================================
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCn-8JMo3dFxsr9V2N9MXdDHB4S4d-0jLw",
+  authDomain: "urbanpowerhour.firebaseapp.com",
+  projectId: "urbanpowerhour",
+  storageBucket: "urbanpowerhour.firebasestorage.app",
+  messagingSenderId: "406775941797",
+  appId: "1:406775941797:web:7cb0fd241af90a19fcdb4c",
+  measurementId: "G-7MFQRY72QZ"
 };
 
 // ============================================================
@@ -16,6 +18,5 @@ const firebaseConfig = {
 // Must match the email list in firestore.rules.
 // ============================================================
 const EDITOR_EMAILS = [
-  'acn@urbanpower.dk',
   'info@urbanpower.dk'
 ];
