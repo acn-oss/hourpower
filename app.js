@@ -1468,8 +1468,8 @@ function renderWeekGrid() {
         const isWE = i >= 5;
         const isFuture = ds > today;
         flexCells.push(`<td class="${isWE ? 'weekend' : ''}">${fn(flex)}</td>`);
-        diffCells.push(`<td class="${isWE ? 'weekend' : ''}">${fn(diff, true, diff !== null && diff < 0 ? 'neg' : '')}</td>`);
-        balCells.push(`<td class="${isWE ? 'weekend' : ''}">${flex !== null && !isFuture ? fn(balance, true, balance < 0 ? 'neg' : '') : '<span class="flex-na">–</span>'}</td>`);
+        diffCells.push(`<td class="${isWE ? 'weekend' : ''}">${fn(diff, true)}</td>`);
+        balCells.push(`<td class="${isWE ? 'weekend' : ''}">${flex !== null && !isFuture ? fn(balance, true) : '<span class="flex-na">–</span>'}</td>`);
       }
 
       $('weekGridFoot').innerHTML += `
@@ -1482,7 +1482,7 @@ function renderWeekGrid() {
         <tr class="flex-row diff">
           <td colspan="2" class="flex-label">Difference</td>
           ${diffCells.join('')}
-          <td>${fn(diffWeekTotal, true, diffWeekTotal < 0 ? 'neg' : '')}</td>
+          <td>${fn(diffWeekTotal, true)}</td>
           <td></td>
         </tr>
         <tr class="flex-row balance">
