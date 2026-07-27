@@ -1449,10 +1449,10 @@ function renderWeekGrid() {
   $('weekGridTable').classList.toggle('hidden', !hasItems);
 
   const entryFor = (projectId, date) => userEntriesCache.find(en => en.projectId === projectId && en.date === date);
-  const yearStart = `${new Date().getFullYear()}-01-01`;
-  const todayStr  = toISODate(new Date());
+  const yearStart  = `${weekStart.getFullYear()}-01-01`;
+  const weekEndStr = toISODate(addDays(weekStart, 6));
   const ytdHoursForProject = (projectId) => userEntriesCache
-    .filter(en => en.projectId === projectId && en.date >= yearStart && en.date <= todayStr)
+    .filter(en => en.projectId === projectId && en.date >= yearStart && en.date <= weekEndStr)
     .reduce((s, en) => s + en.hours, 0);
   const colspan = 11;
 
