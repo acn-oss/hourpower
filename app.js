@@ -122,7 +122,66 @@ function isoWeekNumber(date) {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
-// Returns the expected daily hours for a date based on the work week schedule.
+// Returns { rate, ytd, total } in vacation days.
+// rate  = monthly accrual for the current month's schedule
+// ytd   = earned Jan 1 – end of last completed month (this calendar year)
+// total = earned since schedule started – end of last completed month
+function calcVacation(schedule) {
+  if (!schedule || !schedule.length) return { rate: 0, ytd: 0, total: 0 };
+  const KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const scheduleStart = schedule.reduce((min, s) => s.from < min ? s.from : min, schedule[0].from);
+  const today = new Date();
+
+  // Last completed month = end of the month before this one
+  const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+  const yearStart    = new Date(today.getFullYear(), 0, 1);
+
+  // Weekly hours from a schedule entry
+  const weeklyHrs = (entry) => {
+    if (!entry) return 0;
+    const fromDays = KEYS.reduce((s, k) => s + (entry[k] || 0), 0);
+    return fromDays > 0 ? fromDays : (entry.hours || 0); // legacy fallback
+  };
+
+  // Monthly rate for a given date
+  const monthlyRate = (monthFirstStr) => {
+    let applicable = null;
+    for (const e of schedule) {
+      if (e.from <= monthFirstStr && (!applicable || e.from > applicable.from)) applicable = e;
+    }
+    return applicable ? (weeklyHrs(applicable) / 37) * 2.08 : 0;
+  };
+
+  let total = 0, ytd = 0;
+  const schedStartDate = new Date(scheduleStart + 'T00:00:00');
+
+  // Iterate full months from schedule start up to and including last completed month
+  let m = new Date(scheduleStart.slice(0, 7) + '-01T00:00:00');
+  while (m <= lastMonthEnd) {
+    const mStr = toISODate(m);
+    const daysInMonth = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+
+    // For the partial first month, use the actual start date to find the applicable rate
+    const isFirstMonth = schedStartDate.getFullYear() === m.getFullYear() &&
+                         schedStartDate.getMonth()    === m.getMonth();
+    let proportion = 1;
+    if (isFirstMonth) {
+      const startDay = schedStartDate.getDate();
+      proportion = startDay === 1 ? 1 : (daysInMonth - startDay) / daysInMonth;
+    }
+    const refStr = isFirstMonth ? scheduleStart : mStr;
+    const rate = monthlyRate(refStr) * proportion;
+    total += rate;
+    if (m >= yearStart) ytd += rate;
+    m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+  }
+
+  // Current rate (for display)
+  const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  const rate = monthlyRate(currentMonthStr);
+
+  return { rate, ytd, total };
+}
 // Weekends always return 0. Returns null if the date is before the schedule starts.
 function getFlexHours(dateStr, schedule) {
   if (!schedule || !schedule.length) return null;
@@ -1489,6 +1548,30 @@ function renderWeekGrid() {
           <td colspan="2" class="flex-label">Balance</td>
           ${balCells.join('')}
           <td></td><td></td>
+        </tr>`;
+
+      // Vacation rows
+      const vac = calcVacation(schedule);
+      const fmtDays = (d) => `${trimZeros(Math.round(d * 100) / 100)} d`;
+      const empty7 = dateStrs.map((_, i) => `<td class="${i >= 5 ? 'weekend' : ''}"></td>`).join('');
+      $('weekGridFoot').innerHTML += `
+        <tr class="flex-row vac top-spaced">
+          <td colspan="2" class="flex-label">Vac. rate</td>
+          ${empty7}
+          <td><span class="foot-num">${fmtDays(vac.rate)}/mo</span></td>
+          <td></td>
+        </tr>
+        <tr class="flex-row vac">
+          <td colspan="2" class="flex-label">Vac. YTD</td>
+          ${empty7}
+          <td></td>
+          <td><span class="foot-num">${fmtDays(vac.ytd)}</span></td>
+        </tr>
+        <tr class="flex-row vac">
+          <td colspan="2" class="flex-label">Vac. total</td>
+          ${empty7}
+          <td></td>
+          <td><span class="foot-num">${fmtDays(vac.total)}</span></td>
         </tr>`;
     }
   }
