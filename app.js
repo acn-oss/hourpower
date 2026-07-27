@@ -664,6 +664,9 @@ $('ratesTable').addEventListener('click', async (e) => {
     const idx = parseInt(e.target.dataset.idx);
     const u = allUsersCache.find(x => x.uid === uid);
     if (!u) return;
+    const entry = (u.workWeekSchedule || [])[idx];
+    const fromLabel = entry && entry.from ? ` starting ${formatDate(entry.from)}` : '';
+    if (!confirm(`Delete the working week schedule${fromLabel}?\n\nThis cannot be undone.`)) return;
     u.workWeekSchedule = (u.workWeekSchedule || []).filter((_, i) => i !== idx);
     await db.collection('users').doc(uid).update({ workWeekSchedule: u.workWeekSchedule });
     const lines = document.getElementById(`wwlines-${uid}`);
