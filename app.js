@@ -122,6 +122,47 @@ function isoWeekNumber(date) {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
+// Returns the expected daily hours for a date based on the work week schedule.
+// Weekends always return 0. Returns null if the date is before the schedule starts.
+function getFlexHours(dateStr, schedule) {
+  if (!schedule || !schedule.length) return null;
+  const scheduleStart = schedule.reduce((min, s) => s.from < min ? s.from : min, schedule[0].from);
+  if (dateStr < scheduleStart) return null;
+  const dow = new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun 6=Sat
+  if (dow === 0 || dow === 6) return 0;
+  let applicable = null;
+  for (const entry of schedule) {
+    if (entry.from <= dateStr && (!applicable || entry.from > applicable.from)) {
+      applicable = entry;
+    }
+  }
+  return applicable ? applicable.hours / 5 : 0;
+}
+
+// Returns the cumulative flex balance from the schedule start up to and including targetDateStr.
+// Positive = banked overtime, negative = owed hours.
+function computeBalance(targetDateStr, schedule, entriesCache) {
+  if (!schedule || !schedule.length) return null;
+  const scheduleStart = schedule.reduce((min, s) => s.from < min ? s.from : min, schedule[0].from);
+  if (targetDateStr < scheduleStart) return null;
+  const hoursByDate = {};
+  entriesCache.forEach(en => {
+    if (en.date >= scheduleStart && en.date <= targetDateStr) {
+      hoursByDate[en.date] = (hoursByDate[en.date] || 0) + en.hours;
+    }
+  });
+  let balance = 0;
+  const cursor = new Date(scheduleStart + 'T00:00:00');
+  const end    = new Date(targetDateStr  + 'T00:00:00');
+  while (cursor <= end) {
+    const ds = toISODate(cursor);
+    const flex = getFlexHours(ds, schedule) || 0;
+    balance += (hoursByDate[ds] || 0) - flex;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return balance;
+}
+
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -309,7 +350,14 @@ auth.onAuthStateChanged(async (user) => {
     await db.collection('users').doc(user.uid).update({ role: correctRole });
   }
 
-  currentUser = { uid: user.uid, name: data.name, email: data.email, role: correctRole };
+  currentUser = {
+    uid: user.uid,
+    name: data.name,
+    email: data.email,
+    role: correctRole,
+    employeeType: data.employeeType || '',
+    workWeekSchedule: data.workWeekSchedule || []
+  };
 
   $('authScreen').classList.add('hidden');
   $('verifyScreen').classList.add('hidden');
@@ -1356,6 +1404,50 @@ function renderWeekGrid() {
     dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
     `<td><span class="foot-num">${trimZeros(grandTotalWeek)}</span></td>` +
     `<td><span class="foot-num">${trimZeros(grandTotalAll)}</span></td></tr>`;
+
+  // Flex / Difference / Balance rows — permanent position employees only
+  if (currentUser.employeeType === '2') {
+    const schedule = currentUser.workWeekSchedule || [];
+    if (schedule.length) {
+      const fmt = (v, sign = false) => {
+        if (v === null) return '<span class="flex-na">–</span>';
+        const s = trimZeros(Math.abs(v));
+        if (!sign) return s;
+        return v > 0 ? `+${s}` : v < 0 ? `−${s}` : s;
+      };
+
+      // Balance at end of the day before the week starts
+      const prevDayStr = toISODate(addDays(weekStart, -1));
+      let balance = computeBalance(prevDayStr, schedule, userEntriesCache) || 0;
+
+      const flexCells = [], diffCells = [], balCells = [];
+      for (let i = 0; i < 7; i++) {
+        const ds = dateStrs[i];
+        const flex = getFlexHours(ds, schedule);
+        const logged = dayTotals[i];
+        const diff = flex !== null ? logged - flex : null;
+        if (diff !== null) balance += diff;
+        const isWE = i >= 5;
+        flexCells.push(`<td class="${isWE ? 'weekend' : ''} flex-cell">${fmt(flex)}</td>`);
+        diffCells.push(`<td class="${isWE ? 'weekend' : ''} diff-cell ${diff !== null && diff < 0 ? 'neg' : ''}">${fmt(diff, true)}</td>`);
+        balCells.push(`<td class="${isWE ? 'weekend' : ''} diff-cell ${balance < 0 ? 'neg' : ''}">${flex !== null ? fmt(balance, true) : '<span class="flex-na">–</span>'}</td>`);
+      }
+
+      $('weekGridFoot').innerHTML += `
+        <tr class="flex-row">
+          <td colspan="2" class="flex-label">Flex</td>
+          ${flexCells.join('')}<td></td><td></td>
+        </tr>
+        <tr class="flex-row diff">
+          <td colspan="2" class="flex-label">Difference</td>
+          ${diffCells.join('')}<td></td><td></td>
+        </tr>
+        <tr class="flex-row balance">
+          <td colspan="2" class="flex-label">Balance</td>
+          ${balCells.join('')}<td></td><td></td>
+        </tr>`;
+    }
+  }
 }
 
 $('weekGridBody').addEventListener('change', async (e) => {
