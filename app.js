@@ -1178,12 +1178,20 @@ function renderProjectTotals() {
   $('totalsHint').classList.add('hidden');
 
   const project = projectById(projectId);
+  const isParent = project && getParentIds().has(project.id);
+
+  // For parent projects, aggregate entries from all child projects
+  const relevantIds = isParent
+    ? projectsCache.filter(p => p.parentId === projectId).map(p => p.id)
+    : [projectId];
+
   const byUser = {};
-  allEntriesCache.filter(en => en.projectId === projectId).forEach(en => {
+  allEntriesCache.filter(en => relevantIds.includes(en.projectId)).forEach(en => {
     if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, hours: 0, cost: 0, sales: 0 };
-    const { salesRate, costRate } = resolveProjectRate(project, en.date, en.userId);
+    const entryProject = projectById(en.projectId);
+    const { salesRate, costRate } = resolveProjectRate(entryProject, en.date, en.userId);
     byUser[en.userId].hours += en.hours;
-    byUser[en.userId].cost += en.hours * costRate;
+    byUser[en.userId].cost  += en.hours * costRate;
     byUser[en.userId].sales += en.hours * salesRate;
   });
 
@@ -1302,6 +1310,12 @@ function renderProjectsTable() {
       .join('');
   parentSel.value = curParentVal;
 
+  const statusSelect = (p) => `
+    <select class="proj-status-select" data-status-project="${p.id}">
+      <option value="active"${(!p.status || p.status === 'active') ? ' selected' : ''}>Active</option>
+      <option value="paused"${p.status === 'paused' ? ' selected' : ''}>Paused</option>
+    </select>`;
+
   if (!active.length) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No projects yet — create the first one above.</td></tr>`;
     renderArchivedProjectsTable();
@@ -1342,7 +1356,7 @@ function renderProjectsTable() {
       const children = childrenByParent[p.id] || [];
       const n = (p.assignedUserIds || []).length;
       rows.push(`
-      <tr class="project-parent-row">
+      <tr class="project-parent-row${p.status === 'paused' ? ' proj-paused' : ''}">
         <td class="num-col">
           <span class="parent-toggle link-btn" data-toggle-parent="${p.id}">${collapsed ? '▶' : '▼'}</span>
           ${projectCodeBadgeHtml(p)}
@@ -1351,7 +1365,7 @@ function renderProjectsTable() {
         <td>${escapeHtml(p.client || '')}</td>
         <td>${escapeHtml(PROJECT_CATEGORY_LABELS[p.category] || '—')}</td>
         <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
-        <td class="row-actions">
+        <td class="row-actions">${statusSelect(p)}
           <button class="link-btn" data-edit-project="${p.id}">Edit</button>
           <button class="link-btn" data-access-project="${p.id}">Access</button>
           <button class="link-btn" data-toggle-project="${p.id}">Archive</button>
@@ -1363,13 +1377,13 @@ function renderProjectsTable() {
           rendered.add(c.id);
           const cn = (c.assignedUserIds || []).length;
           rows.push(`
-          <tr class="project-child-row">
+          <tr class="project-child-row${c.status === 'paused' ? ' proj-paused' : ''}">
             <td class="num-col" style="padding-left:28px">${projectCodeBadgeHtml(c)}</td>
             <td style="padding-left:8px">${escapeHtml(c.name)}</td>
             <td>${escapeHtml(c.client || p.client || '')}</td>
             <td>${escapeHtml(PROJECT_CATEGORY_LABELS[c.category || p.category] || '—')}</td>
             <td>${cn === 0 ? 'Everyone' : `${cn} ${cn === 1 ? 'person' : 'people'}`}</td>
-            <td class="row-actions">
+            <td class="row-actions">${statusSelect(c)}
               <button class="link-btn" data-edit-project="${c.id}">Edit</button>
               <button class="link-btn" data-access-project="${c.id}">Access</button>
               <button class="link-btn" data-toggle-project="${c.id}">Archive</button>
@@ -1381,13 +1395,13 @@ function renderProjectsTable() {
       // Standalone row
       const n = (p.assignedUserIds || []).length;
       rows.push(`
-      <tr>
+      <tr class="${p.status === 'paused' ? 'proj-paused' : ''}">
         <td class="num-col">${projectCodeBadgeHtml(p)}</td>
         <td>${escapeHtml(p.name)}</td>
         <td>${escapeHtml(p.client || '')}</td>
         <td>${escapeHtml(PROJECT_CATEGORY_LABELS[p.category] || '—')}</td>
         <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
-        <td class="row-actions">
+        <td class="row-actions">${statusSelect(p)}
           <button class="link-btn" data-edit-project="${p.id}">Edit</button>
           <button class="link-btn" data-access-project="${p.id}">Access</button>
           <button class="link-btn" data-toggle-project="${p.id}">Archive</button>
@@ -1572,6 +1586,15 @@ function parseNonNegative(raw) {
   const v = parseFloat(String(raw).trim());
   return (!isNaN(v) && v >= 0) ? v : 0;
 }
+
+$('projectsTable').addEventListener('change', async (e) => {
+  if (e.target.dataset.statusProject) {
+    const id = e.target.dataset.statusProject;
+    const status = e.target.value;
+    await db.collection('projects').doc(id).update({ status });
+    showStamp('Saved');
+  }
+});
 
 $('projectsTable').querySelector('thead').addEventListener('click', (e) => {
   const th = e.target.closest('[data-sort-key]');
@@ -1936,18 +1959,20 @@ function renderWeekGrid() {
     if (!items.length) return '';
     const header = `<tr class="grid-section-header"><td colspan="${colspan}">${label}</td></tr>`;
     const rows = items.map(p => {
+      const isPaused = p.status === 'paused';
       let rowTotal = 0;
       const cells = dateStrs.map((ds, i) => {
         const en = entryFor(p.id, ds);
         const hours = en ? en.hours : 0;
         rowTotal += hours;
         return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
-          data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
+          data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}"
+          ${isPaused ? 'disabled title="This project is paused"' : ''} /></td>`;
       }).join('');
       const ytd = ytdHoursForProject(p.id);
-      return `<tr>
+      return `<tr class="${isPaused ? 'proj-paused' : ''}">
         <td class="num-col">${projectCodeBadgeHtml(p)}</td>
-        <td>${escapeHtml(p.name)}</td>
+        <td>${escapeHtml(p.name)}${isPaused ? ' <span class="paused-badge">Paused</span>' : ''}</td>
         ${cells}
         <td class="num row-total">${trimZeros(rowTotal)}</td>
         <td class="num row-total">${trimZeros(ytd)}</td>

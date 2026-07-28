@@ -1064,3 +1064,32 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 .project-parent-row td { font-size: 0.88rem; }
 .project-child-row td { border-left: 3px solid var(--accent); }
 .parent-toggle { font-size: 0.75rem; margin-right: 4px; cursor: pointer; }
+
+/* ==========================================================
+   Paused projects
+   ========================================================== */
+.proj-paused { opacity: 0.45; }
+.proj-paused td, .proj-paused th { color: var(--ink-soft); }
+.paused-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  background: var(--line);
+  color: var(--ink-soft);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.proj-status-select {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  margin-right: 8px;
+}
