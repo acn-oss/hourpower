@@ -1062,8 +1062,9 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
    ========================================================== */
 .project-parent-row { background: var(--accent-soft); }
 .project-parent-row td { font-size: 0.88rem; }
-.project-child-row td { border-left: 3px solid var(--accent); }
-.parent-toggle { font-size: 0.75rem; margin-right: 4px; cursor: pointer; }
+.project-child-row { background: #FAFBFA; }
+.toggle-col { width: 28px; text-align: center; padding: 0 4px; }
+.parent-toggle { font-size: 0.78rem; cursor: pointer; color: var(--accent-dark); }
 
 /* ==========================================================
    Paused projects

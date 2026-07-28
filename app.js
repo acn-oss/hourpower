@@ -1289,7 +1289,7 @@ function renderProjectsTable() {
     { key: 'category', label: 'Category'   },
     { key: 'visible',  label: 'Visible to' }
   ];
-  thead.innerHTML = cols.map(({ key, label }) => {
+  thead.innerHTML = '<th class="toggle-col"></th>' + cols.map(({ key, label }) => {
     const isActive = projectSortKey === key;
     const arrow = isActive ? (projectSortDir === 'asc' ? ' ▲' : ' ▼') : '';
     return `<th class="sortable-th${isActive ? ' sort-active' : ''}" data-sort-key="${key}">${label}${arrow}</th>`;
@@ -1317,7 +1317,7 @@ function renderProjectsTable() {
     </select>`;
 
   if (!active.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No projects yet — create the first one above.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No projects yet — create the first one above.</td></tr>`;
     renderArchivedProjectsTable();
     return;
   }
@@ -1357,10 +1357,8 @@ function renderProjectsTable() {
       const n = (p.assignedUserIds || []).length;
       rows.push(`
       <tr class="project-parent-row${p.status === 'paused' ? ' proj-paused' : ''}">
-        <td class="num-col">
-          <span class="parent-toggle link-btn" data-toggle-parent="${p.id}">${collapsed ? '▶' : '▼'}</span>
-          ${projectCodeBadgeHtml(p)}
-        </td>
+        <td class="toggle-col"><span class="parent-toggle link-btn" data-toggle-parent="${p.id}">${collapsed ? '▶' : '▼'}</span></td>
+        <td class="num-col">${projectCodeBadgeHtml(p)}</td>
         <td><strong>${escapeHtml(p.name)}</strong> <span class="optional">(${children.length} sub-project${children.length !== 1 ? 's' : ''})</span></td>
         <td>${escapeHtml(p.client || '')}</td>
         <td>${escapeHtml(PROJECT_CATEGORY_LABELS[p.category] || '—')}</td>
@@ -1378,8 +1376,9 @@ function renderProjectsTable() {
           const cn = (c.assignedUserIds || []).length;
           rows.push(`
           <tr class="project-child-row${c.status === 'paused' ? ' proj-paused' : ''}">
-            <td class="num-col" style="padding-left:28px">${projectCodeBadgeHtml(c)}</td>
-            <td style="padding-left:8px">${escapeHtml(c.name)}</td>
+            <td class="toggle-col"></td>
+            <td class="num-col">${projectCodeBadgeHtml(c)}</td>
+            <td>${escapeHtml(c.name)}</td>
             <td>${escapeHtml(c.client || p.client || '')}</td>
             <td>${escapeHtml(PROJECT_CATEGORY_LABELS[c.category || p.category] || '—')}</td>
             <td>${cn === 0 ? 'Everyone' : `${cn} ${cn === 1 ? 'person' : 'people'}`}</td>
@@ -1396,6 +1395,7 @@ function renderProjectsTable() {
       const n = (p.assignedUserIds || []).length;
       rows.push(`
       <tr class="${p.status === 'paused' ? 'proj-paused' : ''}">
+        <td class="toggle-col"></td>
         <td class="num-col">${projectCodeBadgeHtml(p)}</td>
         <td>${escapeHtml(p.name)}</td>
         <td>${escapeHtml(p.client || '')}</td>
