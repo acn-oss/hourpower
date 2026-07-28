@@ -191,9 +191,9 @@ input, select, textarea {
 .whoami { font-size: 0.85rem; color: #C9D6D2; }
 
 .main {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 28px 20px 60px;
+  width: 100%;
+  margin: 0;
+  padding: 28px 32px 60px;
   display: flex;
   flex-direction: column;
   gap: 24px;
