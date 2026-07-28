@@ -135,19 +135,19 @@
           <label>Project name
             <input type="text" id="projectName" required />
           </label>
-          <div class="field-row">
+          <div class="field-row" style="flex-wrap:nowrap;gap:16px;align-items:flex-end">
             <label style="flex:0 0 auto">Project number <span class="optional">optional</span>
-              <input type="text" id="projectCode" maxlength="10" placeholder="e.g. UP-301" style="width:130px" />
+              <input type="text" id="projectCode" maxlength="10" placeholder="e.g. UP-301" style="width:120px" />
             </label>
             <label style="flex:0 0 auto">Category <span class="optional">sets badge colour</span>
-              <select id="projectCategory" style="width:160px">
+              <select id="projectCategory" style="width:155px">
                 <option value="">Other</option>
                 <option value="architecture">Architecture</option>
                 <option value="publicspace">Public Space</option>
                 <option value="urbanplanning">Urban Planning</option>
               </select>
             </label>
-            <label style="flex:1">Client <span class="optional">optional</span>
+            <label style="flex:3;min-width:0">Client <span class="optional">optional</span>
               <input type="text" id="projectClient" placeholder="Client name" style="width:100%" />
             </label>
           </div>
