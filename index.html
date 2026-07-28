@@ -110,6 +110,21 @@
       </div>
 
       <div class="card">
+        <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="true">
+          <h2>Calendar <span class="chevron" id="vacationChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
+            <button id="vacCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
+            <span id="vacCalLabel" class="week-label"></span>
+            <button id="vacCalNextBtn" class="btn btn-ghost" type="button">›</button>
+            <button id="vacCalTodayBtn" class="btn btn-ghost" type="button">This month</button>
+          </div>
+        </div>
+        <div id="vacationBody" class="collapsible-body">
+          <div id="vacationCalendar"></div>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-header-row">
           <h2>Projects</h2>
           <button id="newProjectBtn" class="btn btn-primary" type="button">+ New project</button>
@@ -327,21 +342,6 @@
             </table>
           </div>
           <p id="allEmptyState" class="empty-state hidden">No entries match these filters.</p>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="false">
-          <h2>Calendar <span class="chevron collapsed" id="vacationChevron">▾</span></h2>
-          <div class="week-nav" onclick="event.stopPropagation()">
-            <button id="vacCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
-            <span id="vacCalLabel" class="week-label"></span>
-            <button id="vacCalNextBtn" class="btn btn-ghost" type="button">›</button>
-            <button id="vacCalTodayBtn" class="btn btn-ghost" type="button">This month</button>
-          </div>
-        </div>
-        <div id="vacationBody" class="collapsible-body hidden">
-          <div id="vacationCalendar"></div>
         </div>
       </div>
 
