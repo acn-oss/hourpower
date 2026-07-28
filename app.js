@@ -672,12 +672,14 @@ function renderVacationCalendar() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const today = toISODate(new Date());
 
+  const DAY_LETTERS = ['S','M','T','W','T','F','S']; // Sun=0 … Sat=6
+
   // Build day metadata
   const days = Array.from({ length: daysInMonth }, (_, i) => {
     const d   = new Date(year, month, i + 1);
     const ds  = toISODate(d);
     const dow = d.getDay();
-    return { num: i + 1, ds, isWE: dow === 0 || dow === 6, isToday: ds === today, weekNum: isoWeekNumber(d) };
+    return { num: i + 1, ds, dow, isWE: dow === 0 || dow === 6, isToday: ds === today, letter: DAY_LETTERS[dow], weekNum: isoWeekNumber(d) };
   });
 
   // Group days by ISO week for the header
@@ -718,6 +720,7 @@ function renderVacationCalendar() {
     <th class="vac-name-col vac-name"></th>
     ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}">
       <div class="vac-day-num">${d.num}</div>
+      <div class="vac-day-letter">${d.letter}</div>
     </th>`).join('')}
   </tr>`;
 
