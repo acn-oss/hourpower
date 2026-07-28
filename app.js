@@ -423,7 +423,8 @@ auth.onAuthStateChanged(async (user) => {
     role: correctRole,
     employeeType: data.employeeType || '',
     workWeekSchedule: data.workWeekSchedule || [],
-    vacationRate: data.vacationRate != null ? data.vacationRate : 2.08
+    vacationRate: data.vacationRate != null ? data.vacationRate : 2.08,
+    feriefridageRate: data.feriefridageRate != null ? data.feriefridageRate : 0.5
   };
 
   $('authScreen').classList.add('hidden');
@@ -637,6 +638,10 @@ function renderRatesTable() {
         data-uid="${u.uid}" data-field="vacationRate"
         value="${u.vacationRate != null ? u.vacationRate : 2.08}"
         placeholder="2,08" /></td>
+      <td class="num"><input type="number" min="0" max="10" step="0.01" class="rate-input ferie-rate-input"
+        data-uid="${u.uid}" data-field="feriefridageRate"
+        value="${u.feriefridageRate != null ? u.feriefridageRate : 0.5}"
+        placeholder="0,5" /></td>
       <td class="row-actions">
         <button class="link-btn" data-archive-user="${u.uid}">Archive</button>
       </td>
@@ -753,6 +758,21 @@ $('ratesTable').addEventListener('change', async (e) => {
       if (u) u.vacationRate = vacationRate;
       showStamp('Saved');
     } catch (err) { alert('Could not save vacation rate: ' + err.message); }
+    return;
+  }
+
+  // Feriefridage rate field
+  if (e.target.classList.contains('ferie-rate-input')) {
+    const uid = e.target.dataset.uid;
+    const raw = e.target.value.trim();
+    const feriefridageRate = raw !== '' && !isNaN(parseFloat(raw)) ? parseFloat(raw) : 0.5;
+    e.target.value = feriefridageRate;
+    try {
+      await db.collection('users').doc(uid).update({ feriefridageRate });
+      const u = allUsersCache.find(x => x.uid === uid);
+      if (u) u.feriefridageRate = feriefridageRate;
+      showStamp('Saved');
+    } catch (err) { alert('Could not save feriefridage rate: ' + err.message); }
     return;
   }
   // Working week date or day hours changed
@@ -1572,26 +1592,39 @@ function renderWeekGrid() {
 
       // Vacation rows
       const vac = calcVacation(schedule, addDays(weekStart, 6), currentUser.vacationRate);
+      const ferie = calcVacation(schedule, addDays(weekStart, 6), currentUser.feriefridageRate);
       const fmtDays = (d) => `${trimZeros(Math.round(d * 100) / 100)} d`;
       const empty7 = dateStrs.map((_, i) => `<td class="${i >= 5 ? 'weekend' : ''}"></td>`).join('');
       $('weekGridFoot').innerHTML += `
         <tr class="flex-row vac top-spaced">
           <td class="flex-label">Vac. rate</td>
           <td class="flex-label">${fmtDays(vac.rate)}/mo</td>
-          ${empty7}
-          <td></td><td></td>
+          ${empty7}<td></td><td></td>
         </tr>
         <tr class="flex-row vac">
           <td colspan="2" class="flex-label">Vac. YTD</td>
-          ${empty7}
-          <td></td>
+          ${empty7}<td></td>
           <td><span class="foot-num">${fmtDays(vac.ytd)}</span></td>
         </tr>
         <tr class="flex-row vac">
           <td colspan="2" class="flex-label">Vac. total</td>
-          ${empty7}
-          <td></td>
+          ${empty7}<td></td>
           <td><span class="foot-num">${fmtDays(vac.total)}</span></td>
+        </tr>
+        <tr class="flex-row vac top-spaced">
+          <td class="flex-label">Feriefridage</td>
+          <td class="flex-label">${fmtDays(ferie.rate)}/mo</td>
+          ${empty7}<td></td><td></td>
+        </tr>
+        <tr class="flex-row vac">
+          <td colspan="2" class="flex-label">Ferie. YTD</td>
+          ${empty7}<td></td>
+          <td><span class="foot-num">${fmtDays(ferie.ytd)}</span></td>
+        </tr>
+        <tr class="flex-row vac">
+          <td colspan="2" class="flex-label">Ferie. total</td>
+          ${empty7}<td></td>
+          <td><span class="foot-num">${fmtDays(ferie.total)}</span></td>
         </tr>`;
     }
   }
