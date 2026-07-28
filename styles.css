@@ -1045,3 +1045,14 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   white-space: nowrap;
   margin-bottom: 1px;
 }
+
+.vac-month-header {
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--paper-card);
+  border-bottom: 1px solid var(--line-soft);
+  letter-spacing: 0.05em;
+}

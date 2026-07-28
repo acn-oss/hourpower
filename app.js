@@ -699,6 +699,17 @@ function renderVacationCalendar() {
     else last.count++;
   });
 
+  // Group days by month for the top header row
+  const monthGroups = [];
+  days.forEach(d => {
+    const dd = new Date(d.ds);
+    const key = `${dd.getFullYear()}-${dd.getMonth()}`;
+    const last = monthGroups[monthGroups.length - 1];
+    if (!last || last.key !== key) {
+      monthGroups.push({ key, label: dd.toLocaleString('en', { month: 'long', year: 'numeric' }), count: 1 });
+    } else last.count++;
+  });
+
   // Absence lookup: { uid: { date: type } }
   const absByUser = {};
   allAbsencesCache.forEach(a => {
@@ -720,6 +731,11 @@ function renderVacationCalendar() {
     return;
   }
 
+  const monthHeaderRow = `<tr>
+    <th class="vac-name-col"></th>
+    ${monthGroups.map(m => `<th colspan="${m.count}" class="vac-month-header">${m.label.toUpperCase()}</th>`).join('')}
+  </tr>`;
+
   const weekHeaderRow = `<tr>
     <th class="vac-name-col"></th>
     ${weekGroups.map(w => `<th colspan="${w.count}" class="vac-week-num">W${w.week}</th>`).join('')}
@@ -728,9 +744,7 @@ function renderVacationCalendar() {
   const dayHeaderRow = `<tr>
     <th class="vac-name-col vac-name"></th>
     ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}${d.isNewMonth ? ' vac-new-month' : ''}">
-      ${d.isNewMonth ? `<div class="vac-month-label">${d.monthLabel}</div>` : ''}
       <div class="vac-day-num">${d.num}</div>
-      <div class="vac-day-letter">${d.letter}</div>
     </th>`).join('')}
   </tr>`;
 
@@ -744,7 +758,7 @@ function renderVacationCalendar() {
         ? `background:${s.bg};color:${s.color}`
         : bg ? `background:${bg}` : '';
       const title = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : '';
-      return `<td class="vac-cell" style="${style}" title="${title}">${s ? s.label : ''}</td>`;
+      return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="${style}" title="${title}">${s ? s.label : ''}</td>`;
     }).join('');
     return `<tr><th class="vac-name">${escapeHtml(u.name)}</th>${cells}</tr>`;
   }).join('');
@@ -752,7 +766,7 @@ function renderVacationCalendar() {
   container.innerHTML = `
     <div class="vac-scroll">
       <table class="vac-grid">
-        <thead>${weekHeaderRow}${dayHeaderRow}</thead>
+        <thead>${monthHeaderRow}${weekHeaderRow}${dayHeaderRow}</thead>
         <tbody>${bodyRows}</tbody>
       </table>
     </div>`;
