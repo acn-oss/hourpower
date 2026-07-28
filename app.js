@@ -582,6 +582,7 @@ function listenAllUsers() {
     renderRatesTable();
     renderArchivedUsersTable();
     renderWeekOverview();
+    renderVacationCalendar();
   });
 }
 
@@ -655,6 +656,10 @@ $('vacCalNextBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCa
 $('vacCalTodayBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderVacationCalendar(); });
 
 makeToggle('vacationToggle', 'vacationBody', 'vacationChevron');
+// Re-render calendar whenever the card is expanded
+$('vacationToggle').addEventListener('click', () => {
+  if ($('vacationToggle').getAttribute('aria-expanded') === 'true') renderVacationCalendar();
+});
 
 function renderVacationCalendar() {
   const label = $('vacCalLabel');
