@@ -654,7 +654,7 @@ function renderCombinedRateLines(uid, schedKey) {
           value="${s[f.field] ?? f.defaultVal}" />
       </label>`).join('');
     return `
-      <div class="work-week-line">
+      <div class="work-week-line rate-combo-line">
         <input type="date" class="ww-date rate-combo-date" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}" value="${s.from || ''}" />
         ${fieldInputs}
         <span class="ww-unit">${rs.unit}</span>
