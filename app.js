@@ -669,17 +669,26 @@ function renderVacationCalendar() {
 
   const year  = vacCalendarDate.getFullYear();
   const month = vacCalendarDate.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const today = toISODate(new Date());
 
   const DAY_LETTERS = ['S','M','T','W','T','F','S']; // Sun=0 … Sat=6
 
+  // Build 2 full months of days starting from the 1st of the chosen month
+  const totalDays = new Date(year, month + 1, 0).getDate()
+                  + new Date(year, month + 2, 0).getDate();
+
   // Build day metadata
-  const days = Array.from({ length: daysInMonth }, (_, i) => {
+  const days = Array.from({ length: totalDays }, (_, i) => {
     const d   = new Date(year, month, i + 1);
     const ds  = toISODate(d);
     const dow = d.getDay();
-    return { num: i + 1, ds, dow, isWE: dow === 0 || dow === 6, isToday: ds === today, letter: DAY_LETTERS[dow], weekNum: isoWeekNumber(d) };
+    const isNewMonth = d.getDate() === 1 && i > 0;
+    return {
+      num: d.getDate(), ds, dow, isWE: dow === 0 || dow === 6,
+      isToday: ds === today, letter: DAY_LETTERS[dow],
+      weekNum: isoWeekNumber(d),
+      isNewMonth, monthLabel: isNewMonth ? d.toLocaleString('en', { month: 'long', year: 'numeric' }) : null
+    };
   });
 
   // Group days by ISO week for the header
@@ -718,7 +727,8 @@ function renderVacationCalendar() {
 
   const dayHeaderRow = `<tr>
     <th class="vac-name-col vac-name"></th>
-    ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}">
+    ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}${d.isNewMonth ? ' vac-new-month' : ''}">
+      ${d.isNewMonth ? `<div class="vac-month-label">${d.monthLabel}</div>` : ''}
       <div class="vac-day-num">${d.num}</div>
       <div class="vac-day-letter">${d.letter}</div>
     </th>`).join('')}

@@ -1034,3 +1034,14 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
+
+.vac-new-month { border-left: 2px solid var(--ink) !important; }
+.vac-month-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  margin-bottom: 1px;
+}
