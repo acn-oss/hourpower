@@ -126,8 +126,9 @@ function isoWeekNumber(date) {
 // rate  = monthly accrual for the current month's schedule
 // ytd   = earned Jan 1 – end of last completed month (this calendar year)
 // total = earned since schedule started – end of last completed month
-function calcVacation(schedule, referenceDate) {
+function calcVacation(schedule, referenceDate, vacRate) {
   if (!schedule || !schedule.length) return { rate: 0, ytd: 0, total: 0 };
+  const VAC_RATE = vacRate != null ? vacRate : 2.08;
   const KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const scheduleStart = schedule.reduce((min, s) => s.from < min ? s.from : min, schedule[0].from);
   const ref = referenceDate || new Date();
@@ -149,7 +150,7 @@ function calcVacation(schedule, referenceDate) {
     for (const e of schedule) {
       if (e.from <= monthFirstStr && (!applicable || e.from > applicable.from)) applicable = e;
     }
-    return applicable ? (weeklyHrs(applicable) / 37) * 2.08 : 0;
+    return applicable ? (weeklyHrs(applicable) / 37) * VAC_RATE : 0;
   };
 
   let total = 0, ytd = 0;
@@ -421,7 +422,8 @@ auth.onAuthStateChanged(async (user) => {
     email: data.email,
     role: correctRole,
     employeeType: data.employeeType || '',
-    workWeekSchedule: data.workWeekSchedule || []
+    workWeekSchedule: data.workWeekSchedule || [],
+    vacationRate: data.vacationRate != null ? data.vacationRate : 2.08
   };
 
   $('authScreen').classList.add('hidden');
@@ -631,6 +633,10 @@ function renderRatesTable() {
         data-rate-uid="${u.uid}" data-rate-field="salesRate" value="${r.salesRate ?? ''}" /></td>
       <td class="num"><input type="number" min="0" step="1" class="rate-input"
         data-rate-uid="${u.uid}" data-rate-field="costRate" value="${r.costRate ?? ''}" /></td>
+      <td class="num"><input type="number" min="0" max="10" step="0.01" class="rate-input vac-rate-input"
+        data-uid="${u.uid}" data-field="vacationRate"
+        value="${u.vacationRate != null ? u.vacationRate : 2.08}"
+        placeholder="2,08" /></td>
       <td class="row-actions">
         <button class="link-btn" data-archive-user="${u.uid}">Archive</button>
       </td>
@@ -735,6 +741,20 @@ $('ratesTable').addEventListener('click', async (e) => {
 });
 
 $('ratesTable').addEventListener('change', async (e) => {
+  // Vacation rate field
+  if (e.target.classList.contains('vac-rate-input')) {
+    const uid = e.target.dataset.uid;
+    const raw = e.target.value.trim();
+    const vacationRate = raw !== '' && !isNaN(parseFloat(raw)) ? parseFloat(raw) : 2.08;
+    e.target.value = vacationRate;
+    try {
+      await db.collection('users').doc(uid).update({ vacationRate });
+      const u = allUsersCache.find(x => x.uid === uid);
+      if (u) u.vacationRate = vacationRate;
+      showStamp('Saved');
+    } catch (err) { alert('Could not save vacation rate: ' + err.message); }
+    return;
+  }
   // Working week date or day hours changed
   if (e.target.classList.contains('ww-date') || e.target.classList.contains('ww-day')) {
     const uid = e.target.dataset.uid;
@@ -1551,15 +1571,15 @@ function renderWeekGrid() {
         </tr>`;
 
       // Vacation rows
-      const vac = calcVacation(schedule, addDays(weekStart, 6));
+      const vac = calcVacation(schedule, addDays(weekStart, 6), currentUser.vacationRate);
       const fmtDays = (d) => `${trimZeros(Math.round(d * 100) / 100)} d`;
       const empty7 = dateStrs.map((_, i) => `<td class="${i >= 5 ? 'weekend' : ''}"></td>`).join('');
       $('weekGridFoot').innerHTML += `
         <tr class="flex-row vac top-spaced">
-          <td colspan="2" class="flex-label">Vac. rate</td>
+          <td class="flex-label">Vac. rate</td>
+          <td class="flex-label">${fmtDays(vac.rate)}/mo</td>
           ${empty7}
-          <td><span class="foot-num">${fmtDays(vac.rate)}/mo</span></td>
-          <td></td>
+          <td></td><td></td>
         </tr>
         <tr class="flex-row vac">
           <td colspan="2" class="flex-label">Vac. YTD</td>
