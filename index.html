@@ -330,6 +330,21 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Vacation <span class="chevron collapsed" id="vacationChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
+            <button id="vacCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
+            <span id="vacCalLabel" class="week-label"></span>
+            <button id="vacCalNextBtn" class="btn btn-ghost" type="button">›</button>
+            <button id="vacCalTodayBtn" class="btn btn-ghost" type="button">This month</button>
+          </div>
+        </div>
+        <div id="vacationBody" class="collapsible-body hidden">
+          <div id="vacationCalendar"></div>
+        </div>
+      </div>
+
     </section>
 
   </main>

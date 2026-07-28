@@ -908,3 +908,77 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 
 /* Bottom-align date with input boxes in rate schedule rows */
 .rate-combo-line { align-items: flex-end; }
+
+/* ==========================================================
+   Absence dropdown row in user grid
+   ========================================================== */
+.absence-select {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  padding: 3px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  width: 100%;
+  max-width: 100px;
+}
+.absence-select:not(:has(option[value=""]:checked)) {
+  background: #FFF5E0;
+  border-color: var(--stamp);
+  color: var(--stamp);
+}
+.grid-section-header.absence-header td {
+  background: #F0EEE8;
+  color: var(--ink-soft);
+}
+
+/* ==========================================================
+   Vacation calendar (editor)
+   ========================================================== */
+.vac-calendar {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+.vac-calendar th {
+  text-align: center;
+  padding: 6px 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid var(--ink);
+}
+.vac-calendar td {
+  vertical-align: top;
+  padding: 4px;
+  border: 1px solid var(--line-soft);
+  min-width: 48px;
+  min-height: 56px;
+}
+.vac-cal-day-num {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.vac-cal-day-num.today { color: var(--accent-dark); }
+.vac-cal-other-month { background: #F5F6F2; }
+.vac-cal-weekend { background: var(--line-soft); }
+.vac-chip {
+  display: inline-block;
+  font-size: 0.68rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin: 1px 1px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.vac-chip.ferielov_full,
+.vac-chip.ferielov_half   { background: #D6EAF8; color: #1A5276; }
+.vac-chip.feriefridag_full,
+.vac-chip.feriefridag_half { background: #D5F5E3; color: #1D6A39; }
+.vac-chip.sick             { background: #FADBD8; color: #922B21; }

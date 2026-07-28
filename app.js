@@ -41,6 +41,8 @@ const db = firebase.firestore();
 let currentUser = null;      // { uid, name, email, role }
 let projectsCache = [];
 let userEntriesCache = [];
+let userAbsencesCache = [];
+let allAbsencesCache = [];
 let allEntriesCache = [];
 let allUsersCache = [];
 let archivedUsersCache = [];
@@ -57,6 +59,7 @@ let projectSortKey = 'code';
 let projectSortDir = 'desc';
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
+let vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let userSortKey = 'code';
 let userSortDir = 'desc';
 
@@ -65,6 +68,15 @@ const EXTRA_TYPES = [
   { type: 'adm', label: 'ADM' },
   { type: 'aq',  label: 'AQ'  },
   { type: 'int', label: 'INT' }
+];
+
+const ABSENCE_TYPES = [
+  { value: '',                  label: '—'                     },
+  { value: 'ferielov_half',     label: '½ dag ferielov'        },
+  { value: 'ferielov_full',     label: '1 dag ferielov'        },
+  { value: 'feriefridag_half',  label: '½ dag feriefridag'     },
+  { value: 'feriefridag_full',  label: '1 dag feriefridag'     },
+  { value: 'sick',              label: 'Sygedag'               }
 ];
 
 // Combined rate schedule types stored in the `rates` Firestore collection
@@ -479,11 +491,13 @@ auth.onAuthStateChanged(async (user) => {
   if (currentUser.role === 'user') {
     listenUserEntries();
     listenUserRates();
+    if (currentUser.employeeType === '2') listenUserAbsences();
   } else {
     initExtraTypeCards();
     listenAllEntriesForEditor();
     listenAllUsers();
     listenRates();
+    listenAllAbsences();
   }
 });
 
@@ -615,6 +629,99 @@ function listenUserRates() {
     currentUser.ratesData = snap.exists ? snap.data() : {};
     renderWeekGrid();
   });
+}
+
+function listenUserAbsences() {
+  db.collection('absences').where('userId', '==', currentUser.uid).onSnapshot(snap => {
+    userAbsencesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderWeekGrid();
+  });
+}
+
+function listenAllAbsences() {
+  db.collection('absences').onSnapshot(snap => {
+    allAbsencesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderVacationCalendar();
+  });
+}
+
+// ============================================================
+// Editor: vacation calendar
+// ============================================================
+const VAC_CAL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+$('vacCalPrevBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCalendarDate = new Date(vacCalendarDate.getFullYear(), vacCalendarDate.getMonth() - 1, 1); renderVacationCalendar(); });
+$('vacCalNextBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCalendarDate = new Date(vacCalendarDate.getFullYear(), vacCalendarDate.getMonth() + 1, 1); renderVacationCalendar(); });
+$('vacCalTodayBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderVacationCalendar(); });
+
+makeToggle('vacationToggle', 'vacationBody', 'vacationChevron');
+
+function renderVacationCalendar() {
+  const label = $('vacCalLabel');
+  if (label) label.textContent = vacCalendarDate.toLocaleString('en', { month: 'long', year: 'numeric' });
+  const container = $('vacationCalendar');
+  if (!container || container.closest('.collapsible-body.hidden')) return;
+
+  const year = vacCalendarDate.getFullYear();
+  const month = vacCalendarDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay  = new Date(year, month + 1, 0);
+  const today    = toISODate(new Date());
+
+  // Start calendar on Monday
+  let startDow = firstDay.getDay(); // 0=Sun
+  startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
+  const calStart = new Date(firstDay);
+  calStart.setDate(calStart.getDate() - startDow);
+
+  // Group absences by date
+  const absByDate = {};
+  allAbsencesCache.forEach(a => {
+    if (!absByDate[a.date]) absByDate[a.date] = [];
+    absByDate[a.date].push(a);
+  });
+
+  // Build calendar weeks
+  const weeks = [];
+  let cursor = new Date(calStart);
+  while (cursor <= lastDay || weeks.length < 4) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      week.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    weeks.push(week);
+    if (cursor > lastDay && weeks.length >= 4) break;
+  }
+
+  const absenceLabel = (type) => {
+    const t = ABSENCE_TYPES.find(x => x.value === type);
+    return t ? t.label : type;
+  };
+
+  container.innerHTML = `
+    <table class="vac-calendar">
+      <thead><tr>${VAC_CAL_DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+      <tbody>
+        ${weeks.map(week => `
+          <tr>${week.map(day => {
+            const ds = toISODate(day);
+            const isOther = day.getMonth() !== month;
+            const isWE    = day.getDay() === 0 || day.getDay() === 6;
+            const isToday = ds === today;
+            const absences = absByDate[ds] || [];
+            const cls = [isOther ? 'vac-cal-other-month' : '', isWE ? 'vac-cal-weekend' : ''].filter(Boolean).join(' ');
+            const chips = absences.map(a =>
+              `<span class="vac-chip ${a.type}">${escapeHtml(a.userName.split(' ')[0])}: ${absenceLabel(a.type)}</span>`
+            ).join('');
+            return `<td class="${cls}">
+              <div class="vac-cal-day-num${isToday ? ' today' : ''}">${day.getDate()}</div>
+              ${chips}
+            </td>`;
+          }).join('')}</tr>`
+        ).join('')}
+      </tbody>
+    </table>`;
 }
 
 function listenRates() {
@@ -1604,6 +1711,23 @@ function renderWeekGrid() {
     renderSection(visibleProjects, 'Projects') +
     visibleExtras.map(g => renderSection(g.items, g.label)).join('');
 
+  // Absence dropdown row — permanent employees only
+  if (currentUser.employeeType === '2') {
+    const absenceOpts = ABSENCE_TYPES.map(t =>
+      `<option value="${t.value}">${t.label}</option>`).join('');
+    const absenceCells = dateStrs.map((ds, i) => {
+      const a = userAbsencesCache.find(x => x.date === ds);
+      const opts = ABSENCE_TYPES.map(t =>
+        `<option value="${t.value}"${a?.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
+      return `<td class="${i >= 5 ? 'weekend' : ''}">
+        <select class="absence-select" data-date="${ds}">${opts}</select>
+      </td>`;
+    }).join('');
+    $('weekGridBody').innerHTML += `
+      <tr class="grid-section-header absence-header"><td colspan="${colspan}">Absence</td></tr>
+      <tr class="absence-row"><td colspan="2"></td>${absenceCells}<td></td><td></td></tr>`;
+  }
+
   const allVisible = [...visibleProjects, ...visibleExtras.flatMap(g => g.items)];
   const dayTotals = dateStrs.map(ds =>
     allVisible.reduce((sum, p) => {
@@ -1678,6 +1802,28 @@ function renderWeekGrid() {
       const ferie = calcVacation(schedule, weekEnd, vacSched, 'feriefridageRate', 0.5);
       const fmtDays = (d) => `${trimZeros(Math.round(d * 100) / 100)} d`;
       const empty7 = dateStrs.map((_, i) => `<td class="${i >= 5 ? 'weekend' : ''}"></td>`).join('');
+
+      // Calculate used days up to end of viewed week
+      const weekEndStr = toISODate(weekEnd);
+      const yearStartStr = `${weekEnd.getFullYear()}-01-01`;
+      const ferielovUsedYTD = userAbsencesCache
+        .filter(a => (a.type === 'ferielov_full' || a.type === 'ferielov_half') && a.date >= yearStartStr && a.date <= weekEndStr)
+        .reduce((s, a) => s + (a.type === 'ferielov_full' ? 1 : 0.5), 0);
+      const ferielovUsedTotal = userAbsencesCache
+        .filter(a => a.type === 'ferielov_full' || a.type === 'ferielov_half')
+        .reduce((s, a) => s + (a.type === 'ferielov_full' ? 1 : 0.5), 0);
+      const feriedagUsedYTD = userAbsencesCache
+        .filter(a => (a.type === 'feriefridag_full' || a.type === 'feriefridag_half') && a.date >= yearStartStr && a.date <= weekEndStr)
+        .reduce((s, a) => s + (a.type === 'feriefridag_full' ? 1 : 0.5), 0);
+      const feriedagUsedTotal = userAbsencesCache
+        .filter(a => a.type === 'feriefridag_full' || a.type === 'feriefridag_half')
+        .reduce((s, a) => s + (a.type === 'feriefridag_full' ? 1 : 0.5), 0);
+
+      const fmtBalance = (earned, used) => {
+        const net = Math.round((earned - used) * 100) / 100;
+        return `${fmtDays(earned)} − ${fmtDays(used)} = <strong>${fmtDays(net)}</strong>`;
+      };
+
       $('weekGridFoot').innerHTML += `
         <tr class="flex-row vac top-spaced">
           <td class="flex-label">Vac. rate (ferielov)</td>
@@ -1687,12 +1833,12 @@ function renderWeekGrid() {
         <tr class="flex-row vac">
           <td colspan="2" class="flex-label">Ferielov YTD</td>
           ${empty7}<td></td>
-          <td><span class="foot-num">${fmtDays(vac.ytd)}</span></td>
+          <td class="flex-label">${fmtBalance(vac.ytd, ferielovUsedYTD)}</td>
         </tr>
         <tr class="flex-row vac">
           <td colspan="2" class="flex-label">Ferielov total</td>
           ${empty7}<td></td>
-          <td><span class="foot-num">${fmtDays(vac.total)}</span></td>
+          <td class="flex-label">${fmtBalance(vac.total, ferielovUsedTotal)}</td>
         </tr>
         <tr class="flex-row vac top-spaced">
           <td class="flex-label">Vac. day off rate (feriefridag)</td>
@@ -1702,18 +1848,37 @@ function renderWeekGrid() {
         <tr class="flex-row vac">
           <td colspan="2" class="flex-label">Feriefridag YTD</td>
           ${empty7}<td></td>
-          <td><span class="foot-num">${fmtDays(ferie.ytd)}</span></td>
+          <td class="flex-label">${fmtBalance(ferie.ytd, feriedagUsedYTD)}</td>
         </tr>
         <tr class="flex-row vac">
           <td colspan="2" class="flex-label">Feriefridag total</td>
           ${empty7}<td></td>
-          <td><span class="foot-num">${fmtDays(ferie.total)}</span></td>
+          <td class="flex-label">${fmtBalance(ferie.total, feriedagUsedTotal)}</td>
         </tr>`;
     }
   }
 }
 
 $('weekGridBody').addEventListener('change', async (e) => {
+  // Absence dropdown
+  if (e.target.classList.contains('absence-select')) {
+    const date = e.target.dataset.date;
+    const type = e.target.value;
+    const docId = `${currentUser.uid}_${date}`;
+    if (!type) {
+      await db.collection('absences').doc(docId).delete().catch(() => {});
+    } else {
+      await db.collection('absences').doc(docId).set({
+        userId: currentUser.uid,
+        userName: currentUser.name,
+        date,
+        type,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    return;
+  }
+
   const input = e.target;
   if (!(input.matches && input.matches('input[data-project]'))) return;
 
