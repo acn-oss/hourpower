@@ -1214,9 +1214,12 @@ function renderProjectTotals() {
       <td class="num">${formatDkk(totalSales - totalCost)}</td>
     </tr>`;
 
-  // Project-level fee summary: expected fee, subadvisors, net fee, margin, factor
-  const expectedFee = (project && project.expectedFee) || 0;
-  const subadvisors = (project && project.subadvisors) || 0;
+  // Project-level fee summary — use children's sum if this is a parent container
+  const _fees = (project && getParentIds().has(project.id))
+    ? computeParentFees(project.id)
+    : project;
+  const expectedFee = (_fees && _fees.expectedFee) || 0;
+  const subadvisors  = (_fees && _fees.subadvisors)  || 0;
   const netFee = expectedFee - subadvisors;
   const margin = netFee - totalCost;
   const factor = totalCost > 0 ? (netFee / totalCost) : null;
@@ -1538,14 +1541,25 @@ $('projectForm').addEventListener('submit', async (e) => {
   const rateLines = readPerUserRateLines();
   if (!name) return;
 
+  // Enforce max 10 children per parent
+  if (parentId && !editingProjectId) {
+    const existingChildren = projectsCache.filter(p => p.parentId === parentId && p.active !== false);
+    if (existingChildren.length >= 10) {
+      alert('This parent project already has 10 sub-projects — the maximum. Archive or delete one before adding another.');
+      return;
+    }
+  }
+
   if (editingProjectId) {
     const updates = { name, code, category, client, description, parentId, rateLines };
     if (!isParent) { updates.expectedFee = expectedFee; updates.subadvisors = subadvisors; }
     await db.collection('projects').doc(editingProjectId).update(updates);
   } else {
+    const parent = parentId ? projectsCache.find(p => p.id === parentId) : null;
+    const inheritedAccess = (parent && parent.assignedUserIds) ? [...parent.assignedUserIds] : [];
     await db.collection('projects').add({
       name, code, category, client, description, parentId, expectedFee, subadvisors, rateLines,
-      active: true, assignedUserIds: [],
+      active: true, assignedUserIds: inheritedAccess,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: currentUser.uid
     });
