@@ -598,11 +598,15 @@ function isProjectVisibleToCurrentUser(p) {
   return !p.assignedUserIds || p.assignedUserIds.length === 0 || p.assignedUserIds.includes(currentUser.uid);
 }
 
-function projectLabelHtml(p) {
-  if (!p.code) return escapeHtml(p.name);
+function projectCodeBadgeHtml(p) {
+  if (!p.code) return '';
   const color = (p.type || 'project') === 'project' ? getProjectBadgeColor(p) : null;
   const style = color ? ` style="background:${color};color:#fff"` : '';
-  return `<span class="proj-code"${style}>${escapeHtml(p.code)}</span>${escapeHtml(p.name)}`;
+  return `<span class="proj-code"${style}>${escapeHtml(p.code)}</span>`;
+}
+
+function projectLabelHtml(p) {
+  return projectCodeBadgeHtml(p) + escapeHtml(p.name);
 }
 
 function projectLabelText(p) {
@@ -1250,10 +1254,11 @@ function renderProjectsTable() {
 
   // Render clickable headers with sort indicators
   const cols = [
-    { key: 'code',    label: 'No.'        },
-    { key: 'name',    label: 'Project'    },
-    { key: 'client',  label: 'Client'     },
-    { key: 'visible', label: 'Visible to' }
+    { key: 'code',     label: 'No.'        },
+    { key: 'name',     label: 'Project'    },
+    { key: 'client',   label: 'Client'     },
+    { key: 'category', label: 'Category'   },
+    { key: 'visible',  label: 'Visible to' }
   ];
   thead.innerHTML = cols.map(({ key, label }) => {
     const active = projectSortKey === key;
@@ -1287,9 +1292,10 @@ function renderProjectsTable() {
     const n = (p.assignedUserIds || []).length;
     return `
     <tr>
-      <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
+      <td class="num-col">${projectCodeBadgeHtml(p)}</td>
       <td>${escapeHtml(p.name)}</td>
       <td>${escapeHtml(p.client || '')}</td>
+      <td>${escapeHtml(PROJECT_CATEGORY_LABELS[p.category] || '—')}</td>
       <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
       <td class="row-actions">
         <button class="link-btn" data-edit-project="${p.id}">Edit</button>
@@ -1308,7 +1314,7 @@ function renderArchivedProjectsTable() {
   $('archivedTable').classList.toggle('hidden', archived.length === 0);
   tbody.innerHTML = archived.map(p => `
     <tr>
-      <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
+      <td class="num-col">${projectCodeBadgeHtml(p)}</td>
       <td>${escapeHtml(p.name)}</td>
       <td>${escapeHtml(p.client || '')}</td>
       <td class="row-actions">
@@ -1687,7 +1693,7 @@ function renderExtraTable(type) {
     const n = (p.assignedUserIds || []).length;
     return `
     <tr>
-      <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
+      <td class="num-col">${projectCodeBadgeHtml(p)}</td>
       <td>${escapeHtml(p.name)}</td>
       <td><span class="stamp-badge ${p.active === false ? 'stamp-badge-off' : ''}">${p.active === false ? 'Archived' : 'Active'}</span></td>
       <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
@@ -1786,7 +1792,7 @@ function renderWeekGrid() {
       }).join('');
       const ytd = ytdHoursForProject(p.id);
       return `<tr>
-        <td class="num-col">${p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : ''}</td>
+        <td class="num-col">${projectCodeBadgeHtml(p)}</td>
         <td>${escapeHtml(p.name)}</td>
         ${cells}
         <td class="num row-total">${trimZeros(rowTotal)}</td>
@@ -2101,7 +2107,7 @@ function renderAllEntries() {
   $('allEmptyState').classList.toggle('hidden', filteredRows.length > 0);
   tbody.innerHTML = filteredRows.map(en => {
     const p = projectById(en.projectId);
-    const codeBadge = p && p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : '';
+    const codeBadge = p && projectCodeBadgeHtml(p);
     return `
     <tr>
       <td>${formatDate(en.date)}</td>
