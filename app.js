@@ -66,6 +66,26 @@ const EXTRA_TYPES = [
   { type: 'aq',  label: 'AQ'  },
   { type: 'int', label: 'INT' }
 ];
+
+// Rate schedule types stored in the `rates` Firestore collection
+const RATE_SCHEDULE_TYPES = [
+  { key: 'salesRateSchedule',    label: 'Sales rate',   unit: 'DKK/h', defaultVal: 0,    fallbackKey: 'salesRate'   },
+  { key: 'costRateSchedule',     label: 'Cost rate',    unit: 'DKK/h', defaultVal: 0,    fallbackKey: 'costRate'    },
+  { key: 'vacationRateSchedule', label: 'Vac. rate',    unit: 'd/mo',  defaultVal: 2.08, fallbackKey: 'vacationRate' },
+  { key: 'feriefridageSchedule', label: 'Feriefridage', unit: 'd/mo',  defaultVal: 0.5,  fallbackKey: 'feriefridageRate' }
+];
+
+// Find the applicable value from a dated schedule for a given date
+function resolveRateFromSchedule(schedule, dateStr, fallback) {
+  if (!schedule || !schedule.length) return fallback;
+  let applicable = null;
+  for (const entry of schedule) {
+    if (entry.from <= dateStr && (!applicable || entry.from > applicable.from)) {
+      applicable = entry;
+    }
+  }
+  return applicable != null ? applicable.value : fallback;
+}
 let extraCache = { adm: [], aq: [], int: [] };
 let currentExtraEdit   = { type: null, id: null };
 let currentExtraAccess = { type: null, id: null };
@@ -126,43 +146,35 @@ function isoWeekNumber(date) {
 // rate  = monthly accrual for the current month's schedule
 // ytd   = earned Jan 1 – end of last completed month (this calendar year)
 // total = earned since schedule started – end of last completed month
-function calcVacation(schedule, referenceDate, vacRate) {
+function calcVacation(schedule, referenceDate, vacRateScheduleOrValue) {
   if (!schedule || !schedule.length) return { rate: 0, ytd: 0, total: 0 };
-  const VAC_RATE = vacRate != null ? vacRate : 2.08;
   const KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const scheduleStart = schedule.reduce((min, s) => s.from < min ? s.from : min, schedule[0].from);
   const ref = referenceDate || new Date();
-
-  // Last completed month = end of the month before the reference date's month
   const lastMonthEnd = new Date(ref.getFullYear(), ref.getMonth(), 0);
   const yearStart    = new Date(ref.getFullYear(), 0, 1);
-
-  // Weekly hours from a schedule entry
   const weeklyHrs = (entry) => {
     if (!entry) return 0;
     const fromDays = KEYS.reduce((s, k) => s + (entry[k] || 0), 0);
-    return fromDays > 0 ? fromDays : (entry.hours || 0); // legacy fallback
+    return fromDays > 0 ? fromDays : (entry.hours || 0);
   };
-
-  // Monthly rate for a given date
-  const monthlyRate = (monthFirstStr) => {
+  const resolveVacRate = (mStr) => {
+    if (Array.isArray(vacRateScheduleOrValue)) return resolveRateFromSchedule(vacRateScheduleOrValue, mStr, 2.08);
+    return vacRateScheduleOrValue != null ? vacRateScheduleOrValue : 2.08;
+  };
+  const monthlyRate = (mStr) => {
     let applicable = null;
     for (const e of schedule) {
-      if (e.from <= monthFirstStr && (!applicable || e.from > applicable.from)) applicable = e;
+      if (e.from <= mStr && (!applicable || e.from > applicable.from)) applicable = e;
     }
-    return applicable ? (weeklyHrs(applicable) / 37) * VAC_RATE : 0;
+    return applicable ? (weeklyHrs(applicable) / 37) * resolveVacRate(mStr) : 0;
   };
-
   let total = 0, ytd = 0;
   const schedStartDate = new Date(scheduleStart + 'T00:00:00');
-
-  // Iterate full months from schedule start up to and including last completed month
   let m = new Date(scheduleStart.slice(0, 7) + '-01T00:00:00');
   while (m <= lastMonthEnd) {
     const mStr = toISODate(m);
     const daysInMonth = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
-
-    // For the partial first month, use the actual start date to find the applicable rate
     const isFirstMonth = schedStartDate.getFullYear() === m.getFullYear() &&
                          schedStartDate.getMonth()    === m.getMonth();
     let proportion = 1;
@@ -176,11 +188,8 @@ function calcVacation(schedule, referenceDate, vacRate) {
     if (m >= yearStart) ytd += rate;
     m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
   }
-
-  // Current rate (for display — based on the month of the reference date)
   const currentMonthStr = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}-01`;
   const rate = monthlyRate(currentMonthStr);
-
   return { rate, ytd, total };
 }
 // Weekends always return 0. Returns null if the date is before the schedule starts.
@@ -438,6 +447,7 @@ auth.onAuthStateChanged(async (user) => {
   listenProjects();
   if (currentUser.role === 'user') {
     listenUserEntries();
+    listenUserRates();
   } else {
     initExtraTypeCards();
     listenAllEntriesForEditor();
@@ -569,6 +579,17 @@ function renderWeekOverview() {
   }).join('');
 }
 
+function listenUserRates() {
+  db.collection('rates').doc(currentUser.uid).onSnapshot(snap => {
+    const data = snap.exists ? snap.data() : {};
+    RATE_SCHEDULE_TYPES.forEach(({ key, fallbackKey, defaultVal }) => {
+      currentUser[key] = data[key] || (data[fallbackKey] != null
+        ? [{ from: '', value: data[fallbackKey] }] : []);
+    });
+    renderWeekGrid();
+  });
+}
+
 function listenRates() {
   ratesUnsub = db.collection('rates').onSnapshot((snap) => {
     ratesCache = {};
@@ -594,58 +615,91 @@ const EMPLOYEE_TYPES = [
   { value: '4', label: '4 Intern position' }
 ];
 
+function renderRateScheduleLines(uid, schedKey, unit) {
+  const r = ratesCache[uid] || {};
+  const schedule = r[schedKey] || [];
+  const t = RATE_SCHEDULE_TYPES.find(x => x.key === schedKey);
+  if (!schedule.length) return `<p class="work-week-empty">No entries yet — click + Add.</p>`;
+  return schedule.map((s, i) => `
+    <div class="work-week-line">
+      <input type="date" class="ww-date rate-sched-date" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}" value="${s.from || ''}" />
+      <input type="number" min="0" step="0.01" class="rate-input rate-sched-val" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}" value="${s.value ?? (t ? t.defaultVal : 0)}" />
+      <span class="ww-unit">${unit}</span>
+      <button type="button" class="link-btn link-danger rate-sched-remove" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}">×</button>
+    </div>`).join('');
+}
+
+async function saveRateSchedule(uid, schedKey) {
+  const r = ratesCache[uid] || {};
+  const container = document.getElementById(`rslines-${uid}-${schedKey}`);
+  if (!container) return;
+  const t = RATE_SCHEDULE_TYPES.find(x => x.key === schedKey);
+  const schedule = (r[schedKey] || []).map((s, i) => {
+    const fromEl = container.querySelector(`.rate-sched-date[data-idx="${i}"]`);
+    const valEl  = container.querySelector(`.rate-sched-val[data-idx="${i}"]`);
+    return {
+      from:  fromEl ? fromEl.value : s.from,
+      value: valEl && valEl.value !== '' ? parseFloat(valEl.value) : (t ? t.defaultVal : 0)
+    };
+  }).filter(s => s.from).sort((a, b) => a.from.localeCompare(b.from));
+  await db.collection('rates').doc(uid).set({ [schedKey]: schedule }, { merge: true });
+  if (!ratesCache[uid]) ratesCache[uid] = {};
+  ratesCache[uid][schedKey] = schedule;
+  showStamp('Saved');
+}
+
 function renderRatesTable() {
   const tbody = $('ratesTable').querySelector('tbody');
   if (!allUsersCache.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No active employees yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">No active employees yet.</td></tr>`;
     return;
   }
   tbody.innerHTML = allUsersCache.map(u => {
-    const r = ratesCache[u.uid] || {};
     const isPermanent = u.employeeType === '2';
-    const schedule = (u.workWeekSchedule || []);
+    const visibleRateTypes = RATE_SCHEDULE_TYPES.filter(t =>
+      isPermanent || (t.key !== 'vacationRateSchedule' && t.key !== 'feriefridageSchedule')
+    );
 
-    const scheduleRows = isPermanent ? `
-    <tr class="work-week-row">
-      <td colspan="5">
-        <div class="work-week-section">
-          <div class="work-week-header">
-            <span class="work-week-label">Working week schedule</span>
-            <button type="button" class="btn btn-ghost btn-sm add-work-week" data-uid="${u.uid}">+ Add</button>
-          </div>
-          <div class="work-week-lines" id="wwlines-${u.uid}">
-            ${renderWorkWeekLines(u.uid, schedule)}
-          </div>
+    const rateScheduleSections = visibleRateTypes.map(t => `
+      <div class="user-rate-section">
+        <div class="work-week-header">
+          <span class="work-week-label">${t.label}</span>
+          <button type="button" class="btn btn-ghost btn-sm rate-sched-add" data-uid="${u.uid}" data-key="${t.key}">+ Add</button>
         </div>
-      </td>
-    </tr>` : '';
+        <div class="work-week-lines" id="rslines-${u.uid}-${t.key}">
+          ${renderRateScheduleLines(u.uid, t.key, t.unit)}
+        </div>
+      </div>`).join('');
+
+    const workWeekSection = isPermanent ? `
+      <div class="user-rate-section">
+        <div class="work-week-header">
+          <span class="work-week-label">Working week schedule</span>
+          <button type="button" class="btn btn-ghost btn-sm add-work-week" data-uid="${u.uid}">+ Add</button>
+        </div>
+        <div class="work-week-lines" id="wwlines-${u.uid}">
+          ${renderWorkWeekLines(u.uid, u.workWeekSchedule || [])}
+        </div>
+      </div>` : '';
 
     return `
     <tr>
       <td><input type="text" class="rate-name-input" data-uid="${u.uid}" data-field="name" value="${escapeHtml(u.name)}" /></td>
       <td>
         <select class="rate-type-select" data-uid="${u.uid}">
-          ${EMPLOYEE_TYPES.map(t =>
-            `<option value="${t.value}"${u.employeeType === t.value ? ' selected' : ''}>${escapeHtml(t.label)}</option>`
-          ).join('')}
+          ${EMPLOYEE_TYPES.map(t => `<option value="${t.value}"${u.employeeType === t.value ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('')}
         </select>
       </td>
-      <td class="num"><input type="number" min="0" step="1" class="rate-input"
-        data-rate-uid="${u.uid}" data-rate-field="salesRate" value="${r.salesRate ?? ''}" /></td>
-      <td class="num"><input type="number" min="0" step="1" class="rate-input"
-        data-rate-uid="${u.uid}" data-rate-field="costRate" value="${r.costRate ?? ''}" /></td>
-      <td class="num"><input type="number" min="0" max="10" step="0.01" class="rate-input vac-rate-input"
-        data-uid="${u.uid}" data-field="vacationRate"
-        value="${u.vacationRate != null ? u.vacationRate : 2.08}"
-        placeholder="2,08" /></td>
-      <td class="num"><input type="number" min="0" max="10" step="0.01" class="rate-input ferie-rate-input"
-        data-uid="${u.uid}" data-field="feriefridageRate"
-        value="${u.feriefridageRate != null ? u.feriefridageRate : 0.5}"
-        placeholder="0,5" /></td>
-      <td class="row-actions">
-        <button class="link-btn" data-archive-user="${u.uid}">Archive</button>
+      <td class="row-actions"><button class="link-btn" data-archive-user="${u.uid}">Archive</button></td>
+    </tr>
+    <tr class="work-week-row">
+      <td colspan="3">
+        <div class="work-week-section">
+          ${rateScheduleSections}
+          ${workWeekSection}
+        </div>
       </td>
-    </tr>${scheduleRows}`;
+    </tr>`;
   }).join('');
 }
 
@@ -718,16 +772,45 @@ async function saveWorkWeekSchedule(uid) {
 }
 
 $('ratesTable').addEventListener('click', async (e) => {
+  // + Add rate schedule row
+  if (e.target.classList.contains('rate-sched-add')) {
+    const uid = e.target.dataset.uid;
+    const key = e.target.dataset.key;
+    const t = RATE_SCHEDULE_TYPES.find(x => x.key === key);
+    if (!ratesCache[uid]) ratesCache[uid] = {};
+    const schedule = ratesCache[uid][key] || [];
+    schedule.push({ from: '', value: t ? t.defaultVal : 0 });
+    ratesCache[uid][key] = schedule;
+    const container = document.getElementById(`rslines-${uid}-${key}`);
+    if (container) container.innerHTML = renderRateScheduleLines(uid, key, t ? t.unit : '');
+    return;
+  }
+  // × Remove rate schedule row
+  if (e.target.classList.contains('rate-sched-remove')) {
+    const uid = e.target.dataset.uid;
+    const key = e.target.dataset.key;
+    const idx = parseInt(e.target.dataset.idx);
+    const t = RATE_SCHEDULE_TYPES.find(x => x.key === key);
+    const entry = (ratesCache[uid]?.[key] || [])[idx];
+    const fromLabel = entry?.from ? ` starting ${formatDate(entry.from)}` : '';
+    if (!confirm(`Delete the ${t?.label || ''} rate${fromLabel}?\n\nThis cannot be undone.`)) return;
+    if (ratesCache[uid]) ratesCache[uid][key] = (ratesCache[uid][key] || []).filter((_, i) => i !== idx);
+    await db.collection('rates').doc(uid).set({ [key]: ratesCache[uid][key] }, { merge: true });
+    const container = document.getElementById(`rslines-${uid}-${key}`);
+    if (container) container.innerHTML = renderRateScheduleLines(uid, key, t ? t.unit : '');
+    showStamp('Saved');
+    return;
+  }
   // + Add working week row
   if (e.target.classList.contains('add-work-week')) {
     const uid = e.target.dataset.uid;
     const u = allUsersCache.find(x => x.uid === uid);
     if (!u) return;
-    u.workWeekSchedule = [...(u.workWeekSchedule || []), { from: '', mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 }];
+    u.workWeekSchedule = [...(u.workWeekSchedule || []), { from: '', mon: 7.4, tue: 7.4, wed: 7.4, thu: 7.4, fri: 7.4, sat: 0, sun: 0 }];
     const lines = document.getElementById(`wwlines-${uid}`);
     if (lines) lines.innerHTML = renderWorkWeekLines(uid, u.workWeekSchedule);
+    return;
   }
-
   // × Remove working week row
   if (e.target.classList.contains('ww-remove')) {
     const uid = e.target.dataset.uid;
@@ -735,7 +818,7 @@ $('ratesTable').addEventListener('click', async (e) => {
     const u = allUsersCache.find(x => x.uid === uid);
     if (!u) return;
     const entry = (u.workWeekSchedule || [])[idx];
-    const fromLabel = entry && entry.from ? ` starting ${formatDate(entry.from)}` : '';
+    const fromLabel = entry?.from ? ` starting ${formatDate(entry.from)}` : '';
     if (!confirm(`Delete the working week schedule${fromLabel}?\n\nThis cannot be undone.`)) return;
     u.workWeekSchedule = (u.workWeekSchedule || []).filter((_, i) => i !== idx);
     await db.collection('users').doc(uid).update({ workWeekSchedule: u.workWeekSchedule });
@@ -743,64 +826,28 @@ $('ratesTable').addEventListener('click', async (e) => {
     if (lines) lines.innerHTML = renderWorkWeekLines(uid, u.workWeekSchedule);
     showStamp('Saved');
   }
+  // Archive employee
+  if (e.target.dataset.archiveUser) {
+    const uid = e.target.dataset.archiveUser;
+    const u = allUsersCache.find(x => x.uid === uid);
+    const name = u ? u.name : 'this employee';
+    if (!confirm(`Archive ${name}?\n\nThey will no longer appear in the app, but their logged hours are kept. You can unarchive them later.`)) return;
+    try {
+      await db.collection('users').doc(uid).update({ active: false });
+    } catch (err) {
+      alert(`Couldn't archive ${name}.\n\n` + (err.code === 'permission-denied'
+        ? 'Firestore rules need updating.'
+        : err.message));
+    }
+  }
 });
 
 $('ratesTable').addEventListener('change', async (e) => {
-  // Vacation rate field
-  if (e.target.classList.contains('vac-rate-input')) {
-    const uid = e.target.dataset.uid;
-    const raw = e.target.value.trim();
-    const vacationRate = raw !== '' && !isNaN(parseFloat(raw)) ? parseFloat(raw) : 2.08;
-    e.target.value = vacationRate;
-    try {
-      await db.collection('users').doc(uid).update({ vacationRate });
-      const u = allUsersCache.find(x => x.uid === uid);
-      if (u) u.vacationRate = vacationRate;
-      showStamp('Saved');
-    } catch (err) { alert('Could not save vacation rate: ' + err.message); }
+  // Rate schedule date or value changed
+  if (e.target.classList.contains('rate-sched-date') || e.target.classList.contains('rate-sched-val')) {
+    await saveRateSchedule(e.target.dataset.uid, e.target.dataset.key);
     return;
   }
-
-  // Feriefridage rate field
-  if (e.target.classList.contains('ferie-rate-input')) {
-    const uid = e.target.dataset.uid;
-    const raw = e.target.value.trim();
-    const feriefridageRate = raw !== '' && !isNaN(parseFloat(raw)) ? parseFloat(raw) : 0.5;
-    e.target.value = feriefridageRate;
-    try {
-      await db.collection('users').doc(uid).update({ feriefridageRate });
-      const u = allUsersCache.find(x => x.uid === uid);
-      if (u) u.feriefridageRate = feriefridageRate;
-      showStamp('Saved');
-    } catch (err) { alert('Could not save feriefridage rate: ' + err.message); }
-    return;
-  }
-  // Working week date or day hours changed
-  if (e.target.classList.contains('ww-date') || e.target.classList.contains('ww-day')) {
-    const uid = e.target.dataset.uid;
-    await saveWorkWeekSchedule(uid);
-    return;
-  }
-  // Rate inputs (salesRate / costRate)
-  if (e.target.matches('input[data-rate-uid]')) {
-    const input = e.target;
-    const uid = input.dataset.rateUid;
-    const field = input.dataset.rateField;
-    const raw = input.value.trim();
-    if (raw !== '' && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) { input.value = ''; return; }
-    const value = raw === '' ? 0 : parseFloat(raw);
-    input.disabled = true;
-    try {
-      await db.collection('rates').doc(uid).set({ [field]: value }, { merge: true });
-      showStamp('Saved');
-    } catch (err) {
-      alert('That rate didn\'t save.\n\n' + (err.code === 'permission-denied'
-        ? 'Firestore rules need updating — repaste firestore.rules into Firebase Console → Databases & Storage → Firestore → Rules → Publish.'
-        : err.message));
-      input.value = '';
-    } finally { input.disabled = false; }
-  }
-
   // Employee type dropdown
   if (e.target.matches('select[data-uid]')) {
     const uid = e.target.dataset.uid;
@@ -809,59 +856,53 @@ $('ratesTable').addEventListener('change', async (e) => {
       await db.collection('users').doc(uid).update({ employeeType });
       const u = allUsersCache.find(x => x.uid === uid);
       if (u) u.employeeType = employeeType;
-      renderRatesTable(); // re-render to show/hide work week section
+      renderRatesTable();
       showStamp('Saved');
-    } catch (err) {
-      alert('Could not save employee type: ' + err.message);
-    }
+    } catch (err) { alert('Could not save employee type: ' + err.message); }
+    return;
+  }
+  // Working week date or day hours changed
+  if (e.target.classList.contains('ww-date') || e.target.classList.contains('ww-day')) {
+    await saveWorkWeekSchedule(e.target.dataset.uid);
     return;
   }
 });
 
 $('ratesTable').addEventListener('blur', async (e) => {
-  // Editable name field
   if (!e.target.matches('input[data-field="name"]')) return;
   const uid = e.target.dataset.uid;
   const name = e.target.value.trim();
   if (!name) { e.target.value = allUsersCache.find(u => u.uid === uid)?.name || ''; return; }
   try {
     await db.collection('users').doc(uid).update({ name });
-    // Update local cache so other renders reflect the new name
     const u = allUsersCache.find(x => x.uid === uid);
     if (u) u.name = name;
     showStamp('Saved');
-  } catch (err) {
-    alert('Could not save name: ' + err.message);
-  }
-}, true); // useCapture=true so blur fires on the input inside the table
+  } catch (err) { alert('Could not save name: ' + err.message); }
+}, true);
 
 function formatDkk(n) {
   return n.toLocaleString('da-DK', { maximumFractionDigits: 0 }) + ' kr.';
 }
 
 function resolveProjectRate(project, dateStr, uid) {
-  const standard = ratesCache[uid] || {};
-  const rateData = project && project.rateLines;
+  const r = ratesCache[uid] || {};
+  // Standard rates from schedule (with fallback to old simple values)
+  const standardSales = resolveRateFromSchedule(r.salesRateSchedule, dateStr, r.salesRate || 0);
+  const standardCost  = resolveRateFromSchedule(r.costRateSchedule,  dateStr, r.costRate  || 0);
 
-  // Support old global array format and new per-user object format
+  const rateData = project && project.rateLines;
   let lines = [];
   if (rateData) {
-    if (Array.isArray(rateData)) {
-      lines = rateData; // legacy: global rate for all users
-    } else if (rateData[uid]) {
-      lines = rateData[uid]; // new: per-user rates
-    }
+    if (Array.isArray(rateData)) lines = rateData;
+    else if (rateData[uid]) lines = rateData[uid];
   }
-
   let applicable = null;
   for (const line of lines) {
-    if (line.usedFrom <= dateStr && (!applicable || line.usedFrom > applicable.usedFrom)) {
-      applicable = line;
-    }
+    if (line.usedFrom <= dateStr && (!applicable || line.usedFrom > applicable.usedFrom)) applicable = line;
   }
-
-  const salesRate = (applicable && applicable.salesRate != null) ? applicable.salesRate : (standard.salesRate || 0);
-  const costRate  = (applicable && applicable.costRate  != null) ? applicable.costRate  : (standard.costRate  || 0);
+  const salesRate = (applicable && applicable.salesRate != null) ? applicable.salesRate : standardSales;
+  const costRate  = (applicable && applicable.costRate  != null) ? applicable.costRate  : standardCost;
   return { salesRate, costRate };
 }
 
@@ -1591,8 +1632,9 @@ function renderWeekGrid() {
         </tr>`;
 
       // Vacation rows
-      const vac = calcVacation(schedule, addDays(weekStart, 6), currentUser.vacationRate);
-      const ferie = calcVacation(schedule, addDays(weekStart, 6), currentUser.feriefridageRate);
+      const weekEnd = addDays(weekStart, 6);
+      const vac   = calcVacation(schedule, weekEnd, currentUser.vacationRateSchedule   || currentUser.vacationRate);
+      const ferie = calcVacation(schedule, weekEnd, currentUser.feriefridageSchedule   || currentUser.feriefridageRate);
       const fmtDays = (d) => `${trimZeros(Math.round(d * 100) / 100)} d`;
       const empty7 = dateStrs.map((_, i) => `<td class="${i >= 5 ? 'weekend' : ''}"></td>`).join('');
       $('weekGridFoot').innerHTML += `
@@ -1725,26 +1767,6 @@ makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
 makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
 makeToggle('rateLineToggle', 'rateLinesSections', 'rateLineChevron');
 makeToggle('archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron');
-
-$('ratesTable').addEventListener('click', async (e) => {
-  const archiveUid = e.target.dataset.archiveUser;
-  if (!archiveUid) return;
-
-  const u = allUsersCache.find(x => x.uid === archiveUid);
-  const name = u ? u.name : 'this employee';
-
-  if (!confirm(`Archive ${name}?\n\nThey will no longer appear in the app, but their logged hours are kept. You can unarchive them later.`)) return;
-  try {
-    await db.collection('users').doc(archiveUid).update({ active: false });
-  } catch (err) {
-    alert(
-      `Couldn't archive ${name}.\n\n` +
-      (err.code === 'permission-denied'
-        ? 'Firestore rules need updating — repaste firestore.rules into Firebase Console → Databases & Storage → Firestore → Rules → Publish, then try again.'
-        : err.message)
-    );
-  }
-});
 
 $('archivedUsersTable').addEventListener('click', async (e) => {
   const unarchiveUid = e.target.dataset.unarchiveUser;

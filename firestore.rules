@@ -36,9 +36,10 @@ service cloud.firestore {
       allow write: if isEditor();
     }
 
-    // Cost/sales rates: editor only — employees can't read these, not even their own
+    // Cost/sales rates: editor can read/write all; users can read their own
     match /rates/{userId} {
-      allow read, write: if isEditor();
+      allow read: if isEditor() || request.auth.uid == userId;
+      allow write: if isEditor();
     }
 
     // Hour entries: a user can read/write their own; editors can read/write all
