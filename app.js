@@ -79,7 +79,42 @@ const ABSENCE_TYPES = [
   { value: 'sick',              label: 'Sygedag'               }
 ];
 
-// Combined rate schedule types stored in the `rates` Firestore collection
+// Project category colour palettes — each prefix within a category
+// gets its own colour; archived > 1 year releases the slot.
+const PROJECT_PALETTES = {
+  architecture:  ['#B71C1C','#C0392B','#D84315','#BF360C','#6D4C41','#880E4F','#AD1457','#8B0000','#A52714','#7B241C'],
+  publicspace:   ['#1B5E20','#2E7D32','#00695C','#004D40','#145A32','#0B5345','#0D6B3C','#117864','#1D6A39','#196F3D'],
+  urbanplanning: ['#0D47A1','#1565C0','#01579B','#0277BD','#283593','#1A237E','#303F9F','#0A3D62','#1B4F72','#154360'],
+  other:         ['#546E7A','#455A64','#37474F','#607D8B','#78909C','#616161','#757575','#424242','#263238','#90A4AE']
+};
+const PROJECT_CATEGORY_LABELS = {
+  architecture:  'Architecture',
+  publicspace:   'Public Space',
+  urbanplanning: 'Urban Planning',
+  other:         'Other'
+};
+
+function getProjectBadgeColor(project) {
+  if (!project.code) return null;
+  const cat = project.category || 'other';
+  const palette = PROJECT_PALETTES[cat] || PROJECT_PALETTES.other;
+  const prefix = project.code.slice(0, 4);
+  const oneYearAgoStr = toISODate(new Date(Date.now() - 365 * 24 * 60 * 60 * 1000));
+
+  // Collect all projects in this category that are active OR archived < 1 year
+  const relevant = projectsCache.filter(p =>
+    (p.category || 'other') === cat &&
+    (p.active !== false || (p.archivedAt && p.archivedAt >= oneYearAgoStr))
+  );
+
+  // Unique first-4-char prefixes in sorted order → stable color assignment
+  const prefixes = [...new Set(
+    relevant.map(p => (p.code || '').slice(0, 4)).filter(Boolean)
+  )].sort();
+
+  const idx = prefixes.indexOf(prefix);
+  return idx >= 0 ? palette[idx % palette.length] : palette[0];
+}
 const RATE_SCHEDULES = {
   rate: {
     key: 'rateSchedule',
@@ -564,7 +599,10 @@ function isProjectVisibleToCurrentUser(p) {
 }
 
 function projectLabelHtml(p) {
-  return (p.code ? `<span class="proj-code">${escapeHtml(p.code)}</span>` : '') + escapeHtml(p.name);
+  if (!p.code) return escapeHtml(p.name);
+  const color = (p.type || 'project') === 'project' ? getProjectBadgeColor(p) : null;
+  const style = color ? ` style="background:${color};color:#fff"` : '';
+  return `<span class="proj-code"${style}>${escapeHtml(p.code)}</span>${escapeHtml(p.name)}`;
 }
 
 function projectLabelText(p) {
@@ -1285,6 +1323,7 @@ $('newProjectBtn').addEventListener('click', () => {
   $('projectId').value = '';
   $('projectName').value = '';
   $('projectCode').value = '';
+  $('projectCategory').value = '';
   $('projectClient').value = '';
   $('projectDesc').value = '';
   $('projectExpectedFee').value = '';
@@ -1365,6 +1404,7 @@ $('projectForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('projectName').value.trim();
   const code = $('projectCode').value.trim().slice(0, 10);
+  const category = $('projectCategory').value;
   const client = $('projectClient').value.trim();
   const description = $('projectDesc').value.trim();
   const expectedFee = parseNonNegative($('projectExpectedFee').value);
@@ -1374,10 +1414,10 @@ $('projectForm').addEventListener('submit', async (e) => {
 
   if (editingProjectId) {
     await db.collection('projects').doc(editingProjectId)
-      .update({ name, code, client, description, expectedFee, subadvisors, rateLines });
+      .update({ name, code, category, client, description, expectedFee, subadvisors, rateLines });
   } else {
     await db.collection('projects').add({
-      name, code, client, description, expectedFee, subadvisors, rateLines,
+      name, code, category, client, description, expectedFee, subadvisors, rateLines,
       active: true, assignedUserIds: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: currentUser.uid
@@ -1416,6 +1456,7 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectId').value = editId;
     $('projectName').value = p.name;
     $('projectCode').value = p.code || '';
+    $('projectCategory').value = p.category || '';
     $('projectClient').value = p.client || '';
     $('projectDesc').value = p.description || '';
     $('projectExpectedFee').value = p.expectedFee || '';
@@ -1425,7 +1466,7 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectForm').classList.remove('hidden');
   }
   if (toggleId) {
-    await db.collection('projects').doc(toggleId).update({ active: false });
+    await db.collection('projects').doc(toggleId).update({ active: false, archivedAt: toISODate(new Date()) });
   }
   if (accessId) {
     openAccessPanel(accessId);
