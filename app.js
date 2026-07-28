@@ -1353,7 +1353,8 @@ function renderProjectsTable() {
       // Parent row
       const fees = computeParentFees(p.id);
       const collapsed = collapsedParents.has(p.id);
-      const children = childrenByParent[p.id] || [];
+      const children = (childrenByParent[p.id] || []).sort((a, b) =>
+        (a.code || a.name).localeCompare(b.code || b.name));
       const n = (p.assignedUserIds || []).length;
       rows.push(`
       <tr class="project-parent-row${p.status === 'paused' ? ' proj-paused' : ''}">
