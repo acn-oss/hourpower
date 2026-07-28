@@ -660,68 +660,84 @@ function renderVacationCalendar() {
   const label = $('vacCalLabel');
   if (label) label.textContent = vacCalendarDate.toLocaleString('en', { month: 'long', year: 'numeric' });
   const container = $('vacationCalendar');
-  if (!container || container.closest('.collapsible-body.hidden')) return;
+  if (!container) return;
 
-  const year = vacCalendarDate.getFullYear();
+  const year  = vacCalendarDate.getFullYear();
   const month = vacCalendarDate.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const lastDay  = new Date(year, month + 1, 0);
-  const today    = toISODate(new Date());
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = toISODate(new Date());
 
-  // Start calendar on Monday
-  let startDow = firstDay.getDay(); // 0=Sun
-  startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
-  const calStart = new Date(firstDay);
-  calStart.setDate(calStart.getDate() - startDow);
-
-  // Group absences by date
-  const absByDate = {};
-  allAbsencesCache.forEach(a => {
-    if (!absByDate[a.date]) absByDate[a.date] = [];
-    absByDate[a.date].push(a);
+  // Build day metadata
+  const days = Array.from({ length: daysInMonth }, (_, i) => {
+    const d   = new Date(year, month, i + 1);
+    const ds  = toISODate(d);
+    const dow = d.getDay();
+    return { num: i + 1, ds, isWE: dow === 0 || dow === 6, isToday: ds === today, weekNum: isoWeekNumber(d) };
   });
 
-  // Build calendar weeks
-  const weeks = [];
-  let cursor = new Date(calStart);
-  while (cursor <= lastDay || weeks.length < 4) {
-    const week = [];
-    for (let d = 0; d < 7; d++) {
-      week.push(new Date(cursor));
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    weeks.push(week);
-    if (cursor > lastDay && weeks.length >= 4) break;
-  }
+  // Group days by ISO week for the header
+  const weekGroups = [];
+  days.forEach(d => {
+    const last = weekGroups[weekGroups.length - 1];
+    if (!last || last.week !== d.weekNum) weekGroups.push({ week: d.weekNum, count: 1 });
+    else last.count++;
+  });
 
-  const absenceLabel = (type) => {
-    const t = ABSENCE_TYPES.find(x => x.value === type);
-    return t ? t.label : type;
+  // Absence lookup: { uid: { date: type } }
+  const absByUser = {};
+  allAbsencesCache.forEach(a => {
+    if (!absByUser[a.userId]) absByUser[a.userId] = {};
+    absByUser[a.userId][a.date] = a.type;
+  });
+
+  const TYPE_STYLE = {
+    ferielov_full:     { label: 'F',   bg: '#2E86C1', color: '#fff' },
+    ferielov_half:     { label: '½F',  bg: '#85C1E9', color: '#1A5276' },
+    feriefridag_full:  { label: 'FF',  bg: '#27AE60', color: '#fff' },
+    feriefridag_half:  { label: '½FF', bg: '#82E0AA', color: '#1D6A39' },
+    sick:              { label: 'S',   bg: '#E74C3C', color: '#fff' }
   };
 
+  const employees = allUsersCache.filter(u => u.active !== false);
+  if (!employees.length) {
+    container.innerHTML = `<p class="empty-state">No active employees.</p>`;
+    return;
+  }
+
+  const weekHeaderRow = `<tr>
+    <th class="vac-name-col"></th>
+    ${weekGroups.map(w => `<th colspan="${w.count}" class="vac-week-num">W${w.week}</th>`).join('')}
+  </tr>`;
+
+  const dayHeaderRow = `<tr>
+    <th class="vac-name-col vac-name"></th>
+    ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}">
+      <div class="vac-day-num">${d.num}</div>
+    </th>`).join('')}
+  </tr>`;
+
+  const bodyRows = employees.map(u => {
+    const userAbs = absByUser[u.uid] || {};
+    const cells = days.map(d => {
+      const type = userAbs[d.ds];
+      const s    = type ? TYPE_STYLE[type] : null;
+      const bg   = d.isWE ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
+      const style = s
+        ? `background:${s.bg};color:${s.color}`
+        : bg ? `background:${bg}` : '';
+      const title = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : '';
+      return `<td class="vac-cell" style="${style}" title="${title}">${s ? s.label : ''}</td>`;
+    }).join('');
+    return `<tr><th class="vac-name">${escapeHtml(u.name)}</th>${cells}</tr>`;
+  }).join('');
+
   container.innerHTML = `
-    <table class="vac-calendar">
-      <thead><tr>${VAC_CAL_DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
-      <tbody>
-        ${weeks.map(week => `
-          <tr>${week.map(day => {
-            const ds = toISODate(day);
-            const isOther = day.getMonth() !== month;
-            const isWE    = day.getDay() === 0 || day.getDay() === 6;
-            const isToday = ds === today;
-            const absences = absByDate[ds] || [];
-            const cls = [isOther ? 'vac-cal-other-month' : '', isWE ? 'vac-cal-weekend' : ''].filter(Boolean).join(' ');
-            const chips = absences.map(a =>
-              `<span class="vac-chip ${a.type}">${escapeHtml(a.userName.split(' ')[0])}: ${absenceLabel(a.type)}</span>`
-            ).join('');
-            return `<td class="${cls}">
-              <div class="vac-cal-day-num${isToday ? ' today' : ''}">${day.getDate()}</div>
-              ${chips}
-            </td>`;
-          }).join('')}</tr>`
-        ).join('')}
-      </tbody>
-    </table>`;
+    <div class="vac-scroll">
+      <table class="vac-grid">
+        <thead>${weekHeaderRow}${dayHeaderRow}</thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>`;
 }
 
 function listenRates() {

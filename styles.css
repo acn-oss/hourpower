@@ -982,3 +982,48 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 .vac-chip.feriefridag_full,
 .vac-chip.feriefridag_half { background: #D5F5E3; color: #1D6A39; }
 .vac-chip.sick             { background: #FADBD8; color: #922B21; }
+
+/* ==========================================================
+   Vacation grid — employees × days
+   ========================================================== */
+.vac-scroll { overflow-x: auto; }
+.vac-grid {
+  border-collapse: collapse;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+.vac-grid th, .vac-grid td { border: 1px solid var(--line-soft); }
+.vac-name-col { min-width: 130px; }
+.vac-name {
+  text-align: left;
+  padding: 5px 10px;
+  font-weight: 500;
+  background: var(--paper-card);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 2px solid var(--line);
+}
+.vac-col-day {
+  text-align: center;
+  padding: 4px 2px;
+  min-width: 30px;
+  background: var(--paper-card);
+}
+.vac-day-num { font-weight: 600; color: var(--ink-soft); font-size: 0.72rem; }
+.vac-cell { text-align: center; padding: 4px 2px; font-weight: 600; font-size: 0.7rem; }
+.vac-we { background: var(--line-soft) !important; }
+.vac-today-col { background: var(--accent-soft) !important; }
+.vac-col-day.vac-today-col .vac-day-num { color: var(--accent-dark); }
+
+.vac-week-num {
+  text-align: left;
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: var(--paper-card);
+  border-bottom: 2px solid var(--ink);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
