@@ -1056,3 +1056,11 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   border-bottom: 1px solid var(--line-soft);
   letter-spacing: 0.05em;
 }
+
+/* ==========================================================
+   Parent / child project rows in editor table
+   ========================================================== */
+.project-parent-row { background: var(--accent-soft); }
+.project-parent-row td { font-size: 0.88rem; }
+.project-child-row td { border-left: 3px solid var(--accent); }
+.parent-toggle { font-size: 0.75rem; margin-right: 4px; cursor: pointer; }

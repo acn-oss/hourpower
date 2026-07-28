@@ -54,9 +54,21 @@ let allUsersUnsub = null;
 let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
-let editingProjectUsers = []; // users shown in the per-user rate sections
+let editingProjectUsers = [];
 let projectSortKey = 'code';
 let projectSortDir = 'desc';
+let collapsedParents = new Set();
+
+function getParentIds() {
+  return new Set(projectsCache.filter(p => p.parentId).map(p => p.parentId).filter(Boolean));
+}
+function computeParentFees(parentId) {
+  const children = projectsCache.filter(p => p.parentId === parentId && p.active !== false);
+  return {
+    expectedFee: children.reduce((s, c) => s + (c.expectedFee || 0), 0),
+    subadvisors:  children.reduce((s, c) => s + (c.subadvisors  || 0), 0)
+  };
+}
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
 let vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -1120,23 +1132,30 @@ function formatDkk(n) {
 
 function resolveProjectRate(project, dateStr, uid) {
   const r = ratesCache[uid] || {};
-  // Resolve from combined rateSchedule; fall back to old separate schedules then to simple values
   const rateEntry = findApplicableEntry(r.rateSchedule || [], dateStr);
   const standardSales = rateEntry?.salesRate ??
     resolveRateFromSchedule(r.salesRateSchedule, dateStr, r.salesRate || 0);
   const standardCost  = rateEntry?.costRate  ??
     resolveRateFromSchedule(r.costRateSchedule,  dateStr, r.costRate  || 0);
 
-  const rateData = project && project.rateLines;
-  let lines = [];
-  if (rateData) {
-    if (Array.isArray(rateData)) lines = rateData;
-    else if (rateData[uid]) lines = rateData[uid];
+  // Check for project-specific rate lines; for children also check parent's lines
+  const checkProject = (proj) => {
+    const rateData = proj && proj.rateLines;
+    if (!rateData) return null;
+    const lines = Array.isArray(rateData) ? rateData : (rateData[uid] || []);
+    let applicable = null;
+    for (const line of lines) {
+      if (line.usedFrom <= dateStr && (!applicable || line.usedFrom > applicable.usedFrom)) applicable = line;
+    }
+    return applicable;
+  };
+
+  let applicable = checkProject(project);
+  if (!applicable && project?.parentId) {
+    const parent = projectsCache.find(p => p.id === project.parentId);
+    applicable = checkProject(parent);
   }
-  let applicable = null;
-  for (const line of lines) {
-    if (line.usedFrom <= dateStr && (!applicable || line.usedFrom > applicable.usedFrom)) applicable = line;
-  }
+
   const salesRate = (applicable && applicable.salesRate != null) ? applicable.salesRate : standardSales;
   const costRate  = (applicable && applicable.costRate  != null) ? applicable.costRate  : standardCost;
   return { salesRate, costRate };
@@ -1252,7 +1271,6 @@ function renderProjectsTable() {
   const tbody = $('projectsTable').querySelector('tbody');
   const thead = $('projectsTable').querySelector('thead tr');
 
-  // Render clickable headers with sort indicators
   const cols = [
     { key: 'code',     label: 'No.'        },
     { key: 'name',     label: 'Project'    },
@@ -1261,49 +1279,121 @@ function renderProjectsTable() {
     { key: 'visible',  label: 'Visible to' }
   ];
   thead.innerHTML = cols.map(({ key, label }) => {
-    const active = projectSortKey === key;
-    const arrow = active ? (projectSortDir === 'asc' ? ' ▲' : ' ▼') : '';
-    return `<th class="sortable-th${active ? ' sort-active' : ''}" data-sort-key="${key}">${label}${arrow}</th>`;
+    const isActive = projectSortKey === key;
+    const arrow = isActive ? (projectSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+    return `<th class="sortable-th${isActive ? ' sort-active' : ''}" data-sort-key="${key}">${label}${arrow}</th>`;
   }).join('') + '<th></th>';
 
   const active = projectsCache.filter(p => p.active !== false);
+  const parentIds = getParentIds();
 
-  // Sort by selected column — 'visible' sorts by number of assigned users
+  // Populate parent dropdown (only standalone + current parents, not children)
+  const parentSel = $('projectParent');
+  const curParentVal = parentSel.value;
+  parentSel.innerHTML = '<option value="">— Standalone —</option>' +
+    active
+      .filter(p => !p.parentId) // can't make a child a parent
+      .filter(p => p.id !== editingProjectId) // can't be own parent
+      .sort((a, b) => (a.code || a.name).localeCompare(b.code || b.name))
+      .map(p => `<option value="${p.id}">${projectLabelText(p)}</option>`)
+      .join('');
+  parentSel.value = curParentVal;
+
+  if (!active.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No projects yet — create the first one above.</td></tr>`;
+    renderArchivedProjectsTable();
+    return;
+  }
+
+  // Sort active projects
   active.sort((a, b) => {
     let cmp;
     if (projectSortKey === 'visible') {
-      const nA = (a.assignedUserIds || []).length;
-      const nB = (b.assignedUserIds || []).length;
-      cmp = nA - nB;
+      cmp = (a.assignedUserIds || []).length - (b.assignedUserIds || []).length;
     } else {
-      const valA = (a[projectSortKey] || '').toLowerCase();
-      const valB = (b[projectSortKey] || '').toLowerCase();
-      cmp = valA.localeCompare(valB);
+      cmp = (a[projectSortKey] || '').toLowerCase().localeCompare((b[projectSortKey] || '').toLowerCase());
     }
     return projectSortDir === 'asc' ? cmp : -cmp;
   });
 
-  if (!active.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No projects yet — create the first one above.</td></tr>`;
-    renderArchivedProjectsTable();
-    return;
-  }
-  tbody.innerHTML = active.map(p => {
-    const n = (p.assignedUserIds || []).length;
-    return `
-    <tr>
-      <td class="num-col">${projectCodeBadgeHtml(p)}</td>
-      <td>${escapeHtml(p.name)}</td>
-      <td>${escapeHtml(p.client || '')}</td>
-      <td>${escapeHtml(PROJECT_CATEGORY_LABELS[p.category] || '—')}</td>
-      <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
-      <td class="row-actions">
-        <button class="link-btn" data-edit-project="${p.id}">Edit</button>
-        <button class="link-btn" data-access-project="${p.id}">Access</button>
-        <button class="link-btn" data-toggle-project="${p.id}">Archive</button>
-      </td>
-    </tr>`;
-  }).join('');
+  // Build grouped rows: parents with children, then standalones
+  const childrenByParent = {};
+  active.forEach(p => {
+    if (p.parentId) {
+      if (!childrenByParent[p.parentId]) childrenByParent[p.parentId] = [];
+      childrenByParent[p.parentId].push(p);
+    }
+  });
+
+  const rows = [];
+  const rendered = new Set();
+
+  active.forEach(p => {
+    if (rendered.has(p.id) || p.parentId) return; // skip children here
+    rendered.add(p.id);
+
+    if (parentIds.has(p.id)) {
+      // Parent row
+      const fees = computeParentFees(p.id);
+      const collapsed = collapsedParents.has(p.id);
+      const children = childrenByParent[p.id] || [];
+      const n = (p.assignedUserIds || []).length;
+      rows.push(`
+      <tr class="project-parent-row">
+        <td class="num-col">
+          <span class="parent-toggle link-btn" data-toggle-parent="${p.id}">${collapsed ? '▶' : '▼'}</span>
+          ${projectCodeBadgeHtml(p)}
+        </td>
+        <td><strong>${escapeHtml(p.name)}</strong> <span class="optional">(${children.length} sub-project${children.length !== 1 ? 's' : ''})</span></td>
+        <td>${escapeHtml(p.client || '')}</td>
+        <td>${escapeHtml(PROJECT_CATEGORY_LABELS[p.category] || '—')}</td>
+        <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
+        <td class="row-actions">
+          <button class="link-btn" data-edit-project="${p.id}">Edit</button>
+          <button class="link-btn" data-access-project="${p.id}">Access</button>
+          <button class="link-btn" data-toggle-project="${p.id}">Archive</button>
+        </td>
+      </tr>`);
+
+      if (!collapsed) {
+        children.forEach(c => {
+          rendered.add(c.id);
+          const cn = (c.assignedUserIds || []).length;
+          rows.push(`
+          <tr class="project-child-row">
+            <td class="num-col" style="padding-left:28px">${projectCodeBadgeHtml(c)}</td>
+            <td style="padding-left:8px">${escapeHtml(c.name)}</td>
+            <td>${escapeHtml(c.client || p.client || '')}</td>
+            <td>${escapeHtml(PROJECT_CATEGORY_LABELS[c.category || p.category] || '—')}</td>
+            <td>${cn === 0 ? 'Everyone' : `${cn} ${cn === 1 ? 'person' : 'people'}`}</td>
+            <td class="row-actions">
+              <button class="link-btn" data-edit-project="${c.id}">Edit</button>
+              <button class="link-btn" data-access-project="${c.id}">Access</button>
+              <button class="link-btn" data-toggle-project="${c.id}">Archive</button>
+            </td>
+          </tr>`);
+        });
+      }
+    } else {
+      // Standalone row
+      const n = (p.assignedUserIds || []).length;
+      rows.push(`
+      <tr>
+        <td class="num-col">${projectCodeBadgeHtml(p)}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${escapeHtml(p.client || '')}</td>
+        <td>${escapeHtml(PROJECT_CATEGORY_LABELS[p.category] || '—')}</td>
+        <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
+        <td class="row-actions">
+          <button class="link-btn" data-edit-project="${p.id}">Edit</button>
+          <button class="link-btn" data-access-project="${p.id}">Access</button>
+          <button class="link-btn" data-toggle-project="${p.id}">Archive</button>
+        </td>
+      </tr>`);
+    }
+  });
+
+  tbody.innerHTML = rows.join('');
   renderArchivedProjectsTable();
 }
 
@@ -1324,16 +1414,44 @@ function renderArchivedProjectsTable() {
     </tr>`).join('');
 }
 
+// Auto-fill category and client from parent when a parent is selected
+$('projectParent').addEventListener('change', () => {
+  const parentId = $('projectParent').value;
+  const parent = parentId ? projectsCache.find(p => p.id === parentId) : null;
+  if (parent) {
+    $('projectCategory').value = parent.category || '';
+    $('projectClient').value = parent.client || '';
+    $('projectCategory').disabled = true;
+    $('projectClient').disabled = true;
+  } else {
+    $('projectCategory').disabled = false;
+    $('projectClient').disabled = false;
+  }
+  updateFeeRowVisibility();
+});
+
+function updateFeeRowVisibility() {
+  const pid = editingProjectId;
+  const isParent = pid && getParentIds().has(pid);
+  $('projectFeeRow').classList.toggle('hidden', isParent);
+  $('projectFeeNote').classList.toggle('hidden', !isParent);
+}
+
 $('newProjectBtn').addEventListener('click', () => {
   editingProjectId = null;
   $('projectId').value = '';
   $('projectName').value = '';
+  $('projectParent').value = '';
   $('projectCode').value = '';
   $('projectCategory').value = '';
+  $('projectCategory').disabled = false;
   $('projectClient').value = '';
+  $('projectClient').disabled = false;
   $('projectDesc').value = '';
   $('projectExpectedFee').value = '';
   $('projectSubadvisors').value = '';
+  $('projectFeeRow').classList.remove('hidden');
+  $('projectFeeNote').classList.add('hidden');
   buildRateLinesSections(null);
   $('accessPanel').classList.add('hidden');
   $('projectForm').classList.remove('hidden');
@@ -1413,17 +1531,20 @@ $('projectForm').addEventListener('submit', async (e) => {
   const category = $('projectCategory').value;
   const client = $('projectClient').value.trim();
   const description = $('projectDesc').value.trim();
-  const expectedFee = parseNonNegative($('projectExpectedFee').value);
-  const subadvisors = parseNonNegative($('projectSubadvisors').value);
+  const parentId = $('projectParent').value || null;
+  const isParent = editingProjectId && getParentIds().has(editingProjectId);
+  const expectedFee = isParent ? undefined : parseNonNegative($('projectExpectedFee').value);
+  const subadvisors  = isParent ? undefined : parseNonNegative($('projectSubadvisors').value);
   const rateLines = readPerUserRateLines();
   if (!name) return;
 
   if (editingProjectId) {
-    await db.collection('projects').doc(editingProjectId)
-      .update({ name, code, category, client, description, expectedFee, subadvisors, rateLines });
+    const updates = { name, code, category, client, description, parentId, rateLines };
+    if (!isParent) { updates.expectedFee = expectedFee; updates.subadvisors = subadvisors; }
+    await db.collection('projects').doc(editingProjectId).update(updates);
   } else {
     await db.collection('projects').add({
-      name, code, category, client, description, expectedFee, subadvisors, rateLines,
+      name, code, category, client, description, parentId, expectedFee, subadvisors, rateLines,
       active: true, assignedUserIds: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: currentUser.uid
@@ -1452,6 +1573,14 @@ $('projectsTable').querySelector('thead').addEventListener('click', (e) => {
 });
 
 $('projectsTable').addEventListener('click', async (e) => {
+  // Collapse/expand parent
+  if (e.target.dataset.toggleParent) {
+    const pid = e.target.dataset.toggleParent;
+    if (collapsedParents.has(pid)) collapsedParents.delete(pid);
+    else collapsedParents.add(pid);
+    renderProjectsTable();
+    return;
+  }
   const editId = e.target.dataset.editProject;
   const toggleId = e.target.dataset.toggleProject;
   const accessId = e.target.dataset.accessProject;
@@ -1464,6 +1593,12 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectCode').value = p.code || '';
     $('projectCategory').value = p.category || '';
     $('projectClient').value = p.client || '';
+    // Parent setup
+    const parentId = p.parentId || '';
+    $('projectParent').value = parentId;
+    $('projectCategory').disabled = !!parentId;
+    $('projectClient').disabled = !!parentId;
+    updateFeeRowVisibility();
     $('projectDesc').value = p.description || '';
     $('projectExpectedFee').value = p.expectedFee || '';
     $('projectSubadvisors').value = p.subadvisors || '';
@@ -1761,7 +1896,12 @@ function renderWeekGrid() {
     return userSortDir === 'asc' ? cmp : -cmp;
   });
 
-  const visibleProjects = sortItems(projectsCache.filter(p => p.active !== false && isProjectVisibleToCurrentUser(p)));
+  const parentIds = getParentIds();
+  const visibleProjects = sortItems(projectsCache.filter(p =>
+    p.active !== false &&
+    !parentIds.has(p.id) && // exclude pure parent containers
+    isProjectVisibleToCurrentUser(p)
+  ));
   const visibleExtras = EXTRA_TYPES.map(({ type, label }) => ({
     label,
     items: sortItems((extraCache[type] || []).filter(p => p.active !== false && isProjectVisibleToCurrentUser(p)))

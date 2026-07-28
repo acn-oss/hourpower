@@ -132,9 +132,16 @@
 
         <form id="projectForm" class="stacked-form hidden">
           <input type="hidden" id="projectId" />
-          <label>Project name
-            <input type="text" id="projectName" required />
-          </label>
+          <div class="field-row" style="flex-wrap:nowrap;gap:16px;align-items:flex-end">
+            <label style="flex:1">Project name
+              <input type="text" id="projectName" required />
+            </label>
+            <label style="flex:0 0 auto">Parent project <span class="optional">optional</span>
+              <select id="projectParent" style="width:200px">
+                <option value="">— Standalone —</option>
+              </select>
+            </label>
+          </div>
           <div class="field-row" style="flex-wrap:nowrap;gap:16px;align-items:flex-end">
             <label style="flex:0 0 auto">Project number <span class="optional">optional</span>
               <input type="text" id="projectCode" maxlength="10" placeholder="e.g. UP-301" style="width:120px" />
@@ -154,7 +161,7 @@
           <label>Description <span class="optional">optional</span>
             <input type="text" id="projectDesc" />
           </label>
-          <div class="field-row">
+          <div class="field-row" id="projectFeeRow">
             <label>Expected fee (DKK) <span class="optional">optional</span>
               <input type="number" min="0" step="1" id="projectExpectedFee" placeholder="0" />
             </label>
@@ -162,6 +169,7 @@
               <input type="number" min="0" step="1" id="projectSubadvisors" placeholder="0" />
             </label>
           </div>
+          <p id="projectFeeNote" class="access-intro hidden" style="margin:0">Expected fee and subadvisors are calculated from child projects and cannot be edited here.</p>
 
           <div class="rate-lines-section">
             <div class="card-header-row card-toggle" id="rateLineToggle" role="button" tabindex="0" aria-expanded="false" style="margin-bottom:0;padding:6px 0;cursor:pointer">
