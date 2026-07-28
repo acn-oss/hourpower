@@ -67,13 +67,40 @@ const EXTRA_TYPES = [
   { type: 'int', label: 'INT' }
 ];
 
-// Rate schedule types stored in the `rates` Firestore collection
-const RATE_SCHEDULE_TYPES = [
-  { key: 'salesRateSchedule',    label: 'Sales rate',   unit: 'DKK/h', defaultVal: 0,    fallbackKey: 'salesRate'   },
-  { key: 'costRateSchedule',     label: 'Cost rate',    unit: 'DKK/h', defaultVal: 0,    fallbackKey: 'costRate'    },
-  { key: 'vacationRateSchedule', label: 'Vac. rate',    unit: 'd/mo',  defaultVal: 2.08, fallbackKey: 'vacationRate' },
-  { key: 'feriefridageSchedule', label: 'Feriefridage', unit: 'd/mo',  defaultVal: 0.5,  fallbackKey: 'feriefridageRate' }
-];
+// Combined rate schedule types stored in the `rates` Firestore collection
+const RATE_SCHEDULES = {
+  rate: {
+    key: 'rateSchedule',
+    fields: [
+      { field: 'salesRate', label: 'Sales', defaultVal: 0 },
+      { field: 'costRate',  label: 'Cost',  defaultVal: 0 }
+    ],
+    unit: 'DKK/h'
+  },
+  vac: {
+    key: 'vacSchedule',
+    fields: [
+      { field: 'vacationRate',      label: 'Ferielov',   defaultVal: 2.08 },
+      { field: 'feriefridageRate',  label: 'Feriefridag', defaultVal: 0.5  }
+    ],
+    unit: 'd/mo'
+  }
+};
+
+// Find the schedule entry applicable on a given date
+function findApplicableEntry(schedule, dateStr) {
+  if (!schedule || !schedule.length) return null;
+  let applicable = null;
+  for (const e of schedule) {
+    if (e.from <= dateStr && (!applicable || e.from > applicable.from)) applicable = e;
+  }
+  return applicable;
+}
+
+function resolveRateFromSchedule(schedule, dateStr, fallback) {
+  const e = findApplicableEntry(schedule, dateStr);
+  return e != null ? e.value : fallback;
+}
 
 // Find the applicable value from a dated schedule for a given date
 function resolveRateFromSchedule(schedule, dateStr, fallback) {
@@ -146,10 +173,10 @@ function isoWeekNumber(date) {
 // rate  = monthly accrual for the current month's schedule
 // ytd   = earned Jan 1 – end of last completed month (this calendar year)
 // total = earned since schedule started – end of last completed month
-function calcVacation(schedule, referenceDate, vacRateScheduleOrValue) {
-  if (!schedule || !schedule.length) return { rate: 0, ytd: 0, total: 0 };
+function calcVacation(workWeekSchedule, referenceDate, vacSchedule, rateField, defaultRate) {
+  if (!workWeekSchedule || !workWeekSchedule.length) return { rate: 0, ytd: 0, total: 0 };
   const KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-  const scheduleStart = schedule.reduce((min, s) => s.from < min ? s.from : min, schedule[0].from);
+  const scheduleStart = workWeekSchedule.reduce((min, s) => s.from < min ? s.from : min, workWeekSchedule[0].from);
   const ref = referenceDate || new Date();
   const lastMonthEnd = new Date(ref.getFullYear(), ref.getMonth(), 0);
   const yearStart    = new Date(ref.getFullYear(), 0, 1);
@@ -159,12 +186,16 @@ function calcVacation(schedule, referenceDate, vacRateScheduleOrValue) {
     return fromDays > 0 ? fromDays : (entry.hours || 0);
   };
   const resolveVacRate = (mStr) => {
-    if (Array.isArray(vacRateScheduleOrValue)) return resolveRateFromSchedule(vacRateScheduleOrValue, mStr, 2.08);
-    return vacRateScheduleOrValue != null ? vacRateScheduleOrValue : 2.08;
+    // New combined vacSchedule format
+    if (Array.isArray(vacSchedule)) {
+      const e = findApplicableEntry(vacSchedule, mStr);
+      if (e) return e[rateField] ?? defaultRate;
+    }
+    return defaultRate;
   };
   const monthlyRate = (mStr) => {
     let applicable = null;
-    for (const e of schedule) {
+    for (const e of workWeekSchedule) {
       if (e.from <= mStr && (!applicable || e.from > applicable.from)) applicable = e;
     }
     return applicable ? (weeklyHrs(applicable) / 37) * resolveVacRate(mStr) : 0;
@@ -581,11 +612,7 @@ function renderWeekOverview() {
 
 function listenUserRates() {
   db.collection('rates').doc(currentUser.uid).onSnapshot(snap => {
-    const data = snap.exists ? snap.data() : {};
-    RATE_SCHEDULE_TYPES.forEach(({ key, fallbackKey, defaultVal }) => {
-      currentUser[key] = data[key] || (data[fallbackKey] != null
-        ? [{ from: '', value: data[fallbackKey] }] : []);
-    });
+    currentUser.ratesData = snap.exists ? snap.data() : {};
     renderWeekGrid();
   });
 }
@@ -615,33 +642,40 @@ const EMPLOYEE_TYPES = [
   { value: '4', label: '4 Intern position' }
 ];
 
-function renderRateScheduleLines(uid, schedKey, unit) {
-  const r = ratesCache[uid] || {};
-  const schedule = r[schedKey] || [];
-  const t = RATE_SCHEDULE_TYPES.find(x => x.key === schedKey);
+function renderCombinedRateLines(uid, schedKey) {
+  const rs = RATE_SCHEDULES[schedKey === 'rateSchedule' ? 'rate' : 'vac'];
+  const schedule = (ratesCache[uid] || {})[schedKey] || [];
   if (!schedule.length) return `<p class="work-week-empty">No entries yet — click + Add.</p>`;
-  return schedule.map((s, i) => `
-    <div class="work-week-line">
-      <input type="date" class="ww-date rate-sched-date" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}" value="${s.from || ''}" />
-      <input type="number" min="0" step="0.01" class="rate-input rate-sched-val" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}" value="${s.value ?? (t ? t.defaultVal : 0)}" />
-      <span class="ww-unit">${unit}</span>
-      <button type="button" class="link-btn link-danger rate-sched-remove" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}">×</button>
-    </div>`).join('');
+  return schedule.map((s, i) => {
+    const fieldInputs = rs.fields.map(f => `
+      <label class="ww-day-label">${f.label}
+        <input type="number" min="0" step="${rs.unit === 'd/mo' ? '0.01' : '1'}" class="rate-input rate-combo-val"
+          data-uid="${uid}" data-key="${schedKey}" data-field="${f.field}" data-idx="${i}"
+          value="${s[f.field] ?? f.defaultVal}" />
+      </label>`).join('');
+    return `
+      <div class="work-week-line">
+        <input type="date" class="ww-date rate-combo-date" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}" value="${s.from || ''}" />
+        ${fieldInputs}
+        <span class="ww-unit">${rs.unit}</span>
+        <button type="button" class="link-btn link-danger rate-combo-remove" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}">×</button>
+      </div>`;
+  }).join('');
 }
 
-async function saveRateSchedule(uid, schedKey) {
-  const r = ratesCache[uid] || {};
+async function saveCombinedRateSchedule(uid, schedKey) {
+  const rs = RATE_SCHEDULES[schedKey === 'rateSchedule' ? 'rate' : 'vac'];
   const container = document.getElementById(`rslines-${uid}-${schedKey}`);
   if (!container) return;
-  const t = RATE_SCHEDULE_TYPES.find(x => x.key === schedKey);
-  const schedule = (r[schedKey] || []).map((s, i) => {
-    const fromEl = container.querySelector(`.rate-sched-date[data-idx="${i}"]`);
-    const valEl  = container.querySelector(`.rate-sched-val[data-idx="${i}"]`);
-    return {
-      from:  fromEl ? fromEl.value : s.from,
-      value: valEl && valEl.value !== '' ? parseFloat(valEl.value) : (t ? t.defaultVal : 0)
-    };
-  }).filter(s => s.from).sort((a, b) => a.from.localeCompare(b.from));
+  const schedule = ((ratesCache[uid] || {})[schedKey] || []).map((s, i) => {
+    const fromEl = container.querySelector(`.rate-combo-date[data-idx="${i}"]`);
+    const entry = { from: fromEl ? fromEl.value : s.from };
+    rs.fields.forEach(f => {
+      const el = container.querySelector(`.rate-combo-val[data-field="${f.field}"][data-idx="${i}"]`);
+      entry[f.field] = el && el.value !== '' ? parseFloat(el.value) : f.defaultVal;
+    });
+    return entry;
+  }).filter(e => e.from).sort((a, b) => a.from.localeCompare(b.from));
   await db.collection('rates').doc(uid).set({ [schedKey]: schedule }, { merge: true });
   if (!ratesCache[uid]) ratesCache[uid] = {};
   ratesCache[uid][schedKey] = schedule;
@@ -656,20 +690,17 @@ function renderRatesTable() {
   }
   tbody.innerHTML = allUsersCache.map(u => {
     const isPermanent = u.employeeType === '2';
-    const visibleRateTypes = RATE_SCHEDULE_TYPES.filter(t =>
-      isPermanent || (t.key !== 'vacationRateSchedule' && t.key !== 'feriefridageSchedule')
-    );
 
-    const rateScheduleSections = visibleRateTypes.map(t => `
+    const makeSection = (schedKey, title, addLabel) => `
       <div class="user-rate-section">
         <div class="work-week-header">
-          <span class="work-week-label">${t.label}</span>
-          <button type="button" class="btn btn-ghost btn-sm rate-sched-add" data-uid="${u.uid}" data-key="${t.key}">+ Add</button>
+          <span class="work-week-label">${title}</span>
+          <button type="button" class="btn btn-ghost btn-sm rate-combo-add" data-uid="${u.uid}" data-key="${schedKey}">+ ${addLabel}</button>
         </div>
-        <div class="work-week-lines" id="rslines-${u.uid}-${t.key}">
-          ${renderRateScheduleLines(u.uid, t.key, t.unit)}
+        <div class="work-week-lines" id="rslines-${u.uid}-${schedKey}">
+          ${renderCombinedRateLines(u.uid, schedKey)}
         </div>
-      </div>`).join('');
+      </div>`;
 
     const workWeekSection = isPermanent ? `
       <div class="user-rate-section">
@@ -681,6 +712,10 @@ function renderRatesTable() {
           ${renderWorkWeekLines(u.uid, u.workWeekSchedule || [])}
         </div>
       </div>` : '';
+
+    const vacSection = isPermanent
+      ? makeSection('vacSchedule', 'Vac. rate (ferielov) & Vac. day off rate (feriefridag)', 'Add')
+      : '';
 
     return `
     <tr>
@@ -695,8 +730,9 @@ function renderRatesTable() {
     <tr class="work-week-row">
       <td colspan="3">
         <div class="work-week-section">
-          ${rateScheduleSections}
+          ${makeSection('rateSchedule', 'Sales & Cost rate', 'Add')}
           ${workWeekSection}
+          ${vacSection}
         </div>
       </td>
     </tr>`;
@@ -772,32 +808,32 @@ async function saveWorkWeekSchedule(uid) {
 }
 
 $('ratesTable').addEventListener('click', async (e) => {
-  // + Add rate schedule row
-  if (e.target.classList.contains('rate-sched-add')) {
+  // + Add combined rate schedule row
+  if (e.target.classList.contains('rate-combo-add')) {
     const uid = e.target.dataset.uid;
     const key = e.target.dataset.key;
-    const t = RATE_SCHEDULE_TYPES.find(x => x.key === key);
+    const rs = RATE_SCHEDULES[key === 'rateSchedule' ? 'rate' : 'vac'];
     if (!ratesCache[uid]) ratesCache[uid] = {};
-    const schedule = ratesCache[uid][key] || [];
-    schedule.push({ from: '', value: t ? t.defaultVal : 0 });
-    ratesCache[uid][key] = schedule;
+    const entry = { from: '' };
+    rs.fields.forEach(f => { entry[f.field] = f.defaultVal; });
+    (ratesCache[uid][key] = ratesCache[uid][key] || []).push(entry);
     const container = document.getElementById(`rslines-${uid}-${key}`);
-    if (container) container.innerHTML = renderRateScheduleLines(uid, key, t ? t.unit : '');
+    if (container) container.innerHTML = renderCombinedRateLines(uid, key);
     return;
   }
-  // × Remove rate schedule row
-  if (e.target.classList.contains('rate-sched-remove')) {
+  // × Remove combined rate schedule row
+  if (e.target.classList.contains('rate-combo-remove')) {
     const uid = e.target.dataset.uid;
     const key = e.target.dataset.key;
     const idx = parseInt(e.target.dataset.idx);
-    const t = RATE_SCHEDULE_TYPES.find(x => x.key === key);
     const entry = (ratesCache[uid]?.[key] || [])[idx];
     const fromLabel = entry?.from ? ` starting ${formatDate(entry.from)}` : '';
-    if (!confirm(`Delete the ${t?.label || ''} rate${fromLabel}?\n\nThis cannot be undone.`)) return;
+    const label = key === 'rateSchedule' ? 'Sales & Cost rate' : 'Vac. rate';
+    if (!confirm(`Delete the ${label} entry${fromLabel}?\n\nThis cannot be undone.`)) return;
     if (ratesCache[uid]) ratesCache[uid][key] = (ratesCache[uid][key] || []).filter((_, i) => i !== idx);
     await db.collection('rates').doc(uid).set({ [key]: ratesCache[uid][key] }, { merge: true });
     const container = document.getElementById(`rslines-${uid}-${key}`);
-    if (container) container.innerHTML = renderRateScheduleLines(uid, key, t ? t.unit : '');
+    if (container) container.innerHTML = renderCombinedRateLines(uid, key);
     showStamp('Saved');
     return;
   }
@@ -844,8 +880,8 @@ $('ratesTable').addEventListener('click', async (e) => {
 
 $('ratesTable').addEventListener('change', async (e) => {
   // Rate schedule date or value changed
-  if (e.target.classList.contains('rate-sched-date') || e.target.classList.contains('rate-sched-val')) {
-    await saveRateSchedule(e.target.dataset.uid, e.target.dataset.key);
+  if (e.target.classList.contains('rate-combo-date') || e.target.classList.contains('rate-combo-val')) {
+    await saveCombinedRateSchedule(e.target.dataset.uid, e.target.dataset.key);
     return;
   }
   // Employee type dropdown
@@ -887,9 +923,12 @@ function formatDkk(n) {
 
 function resolveProjectRate(project, dateStr, uid) {
   const r = ratesCache[uid] || {};
-  // Standard rates from schedule (with fallback to old simple values)
-  const standardSales = resolveRateFromSchedule(r.salesRateSchedule, dateStr, r.salesRate || 0);
-  const standardCost  = resolveRateFromSchedule(r.costRateSchedule,  dateStr, r.costRate  || 0);
+  // Resolve from combined rateSchedule; fall back to old separate schedules then to simple values
+  const rateEntry = findApplicableEntry(r.rateSchedule || [], dateStr);
+  const standardSales = rateEntry?.salesRate ??
+    resolveRateFromSchedule(r.salesRateSchedule, dateStr, r.salesRate || 0);
+  const standardCost  = rateEntry?.costRate  ??
+    resolveRateFromSchedule(r.costRateSchedule,  dateStr, r.costRate  || 0);
 
   const rateData = project && project.rateLines;
   let lines = [];
@@ -1633,38 +1672,40 @@ function renderWeekGrid() {
 
       // Vacation rows
       const weekEnd = addDays(weekStart, 6);
-      const vac   = calcVacation(schedule, weekEnd, currentUser.vacationRateSchedule   || currentUser.vacationRate);
-      const ferie = calcVacation(schedule, weekEnd, currentUser.feriefridageSchedule   || currentUser.feriefridageRate);
+      const ratesData = currentUser.ratesData || {};
+      const vacSched = ratesData.vacSchedule || [];
+      const vac   = calcVacation(schedule, weekEnd, vacSched, 'vacationRate', 2.08);
+      const ferie = calcVacation(schedule, weekEnd, vacSched, 'feriefridageRate', 0.5);
       const fmtDays = (d) => `${trimZeros(Math.round(d * 100) / 100)} d`;
       const empty7 = dateStrs.map((_, i) => `<td class="${i >= 5 ? 'weekend' : ''}"></td>`).join('');
       $('weekGridFoot').innerHTML += `
         <tr class="flex-row vac top-spaced">
-          <td class="flex-label">Vac. rate</td>
+          <td class="flex-label">Vac. rate (ferielov)</td>
           <td class="flex-label">${fmtDays(vac.rate)}/mo</td>
           ${empty7}<td></td><td></td>
         </tr>
         <tr class="flex-row vac">
-          <td colspan="2" class="flex-label">Vac. YTD</td>
+          <td colspan="2" class="flex-label">Ferielov YTD</td>
           ${empty7}<td></td>
           <td><span class="foot-num">${fmtDays(vac.ytd)}</span></td>
         </tr>
         <tr class="flex-row vac">
-          <td colspan="2" class="flex-label">Vac. total</td>
+          <td colspan="2" class="flex-label">Ferielov total</td>
           ${empty7}<td></td>
           <td><span class="foot-num">${fmtDays(vac.total)}</span></td>
         </tr>
         <tr class="flex-row vac top-spaced">
-          <td class="flex-label">Feriefridage</td>
+          <td class="flex-label">Vac. day off rate (feriefridag)</td>
           <td class="flex-label">${fmtDays(ferie.rate)}/mo</td>
           ${empty7}<td></td><td></td>
         </tr>
         <tr class="flex-row vac">
-          <td colspan="2" class="flex-label">Ferie. YTD</td>
+          <td colspan="2" class="flex-label">Feriefridag YTD</td>
           ${empty7}<td></td>
           <td><span class="foot-num">${fmtDays(ferie.ytd)}</span></td>
         </tr>
         <tr class="flex-row vac">
-          <td colspan="2" class="flex-label">Ferie. total</td>
+          <td colspan="2" class="flex-label">Feriefridag total</td>
           ${empty7}<td></td>
           <td><span class="foot-num">${fmtDays(ferie.total)}</span></td>
         </tr>`;
