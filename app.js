@@ -1974,6 +1974,7 @@ function renderWeekGrid() {
   // Map of date → absence type for the current user (used to dim inputs and adjust flex calc)
   const absenceByDate = {};
   userAbsencesCache.forEach(a => { absenceByDate[a.date] = a.type; });
+  console.log('[renderWeekGrid] absenceByDate:', absenceByDate, 'userAbsencesCache length:', userAbsencesCache.length);
 
   const renderInputRow = (p) => {
     const isPaused = p.status === 'paused';
@@ -2192,20 +2193,27 @@ $('weekGridBody').addEventListener('change', async (e) => {
   if (e.target.classList.contains('absence-select')) {
     const date = e.target.dataset.date;
     const type = e.target.value;
+    console.log('[Absence] selected:', type, 'for date:', date);
     const docId = `${currentUser.uid}_${date}`;
-    if (!type) {
-      await db.collection('absences').doc(docId).delete().catch(() => {});
-    } else {
-      await db.collection('absences').doc(docId).set({
-        userId: currentUser.uid,
-        userName: currentUser.name,
-        date,
-        type,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      // Delete all hour entries logged for this day
-      const toDelete = userEntriesCache.filter(en => en.date === date);
-      await Promise.all(toDelete.map(en => db.collection('entries').doc(en.id).delete()));
+    try {
+      if (!type) {
+        await db.collection('absences').doc(docId).delete();
+        console.log('[Absence] deleted');
+      } else {
+        await db.collection('absences').doc(docId).set({
+          userId: currentUser.uid,
+          userName: currentUser.name,
+          date,
+          type,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('[Absence] saved to Firestore');
+        const toDelete = userEntriesCache.filter(en => en.date === date);
+        console.log('[Absence] deleting', toDelete.length, 'hour entries');
+        await Promise.all(toDelete.map(en => db.collection('entries').doc(en.id).delete()));
+      }
+    } catch (err) {
+      console.error('[Absence] ERROR:', err);
     }
     return;
   }
