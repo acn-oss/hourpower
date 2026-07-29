@@ -2053,7 +2053,7 @@ function renderWeekGrid() {
       const a = userAbsencesCache.find(x => x.date === ds);
       const opts = ABSENCE_TYPES.map(t =>
         `<option value="${t.value}"${a && a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
-      return `<td><select class="absence-select" data-date="${ds}">${opts}</select></td>`;
+      return `<td><select class="absence-select" data-date="${ds}" data-type="${a ? a.type : ''}">${opts}</select></td>`;
     }).join('');
     $('weekGridBody').innerHTML += `
       <tr class="grid-section-header absence-header"><td colspan="${colspan}">Absence</td></tr>
@@ -2194,6 +2194,7 @@ $('weekGridBody').addEventListener('change', async (e) => {
     const date = e.target.dataset.date;
     const type = e.target.value;
     console.log('[Absence] selected:', type, 'for date:', date);
+    e.target.dataset.type = type; // update colour immediately
     const docId = `${currentUser.uid}_${date}`;
     try {
       if (!type) {
