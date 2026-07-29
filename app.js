@@ -108,6 +108,11 @@ const PROJECT_CATEGORY_LABELS = {
 
 function getProjectBadgeColor(project) {
   if (!project.code) return null;
+  // Children inherit their parent's colour
+  if (project.parentId) {
+    const parent = projectsCache.find(p => p.id === project.parentId);
+    if (parent) return getProjectBadgeColor(parent);
+  }
   const cat = project.category || 'other';
   const palette = PROJECT_PALETTES[cat] || PROJECT_PALETTES.other;
   const prefix = project.code.slice(0, 4);
