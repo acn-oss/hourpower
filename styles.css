@@ -461,7 +461,6 @@ input, select, textarea {
   color: var(--ink-soft);
 }
 
-.grid-table { table-layout: fixed; width: 100%; }
 .grid-table th, .grid-table td { text-align: center; }
 .grid-table th:nth-child(2), .grid-table td:nth-child(2) { text-align: left; }
 .grid-table th:nth-child(3), .grid-table td:nth-child(3) { text-align: left; }

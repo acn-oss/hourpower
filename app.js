@@ -1934,7 +1934,6 @@ function renderWeekGrid() {
     <col style="width:58px"><col style="width:58px"><col style="width:58px"><col style="width:58px">
     <col style="width:78px">
     <col style="width:78px">`;
-  $('weekGridCols').innerHTML = colgroup;
 
   const sortArrow = (key) => userSortKey === key ? (userSortDir === 'asc' ? ' ▲' : ' ▼') : '';
   $('weekGridHeadRow').innerHTML =
@@ -2118,6 +2117,16 @@ function renderWeekGrid() {
       }
 
       $('flexTableCols').innerHTML = colgroup;
+      // After the browser has laid out the grid, copy its column widths to the flex table
+      requestAnimationFrame(() => {
+        const gridThs = $('weekGridTable').querySelectorAll('thead th');
+        const flexCols = $('flexTableCols').querySelectorAll('col');
+        gridThs.forEach((th, i) => {
+          if (flexCols[i]) flexCols[i].style.width = th.offsetWidth + 'px';
+        });
+        $('flexTable').style.tableLayout = 'fixed';
+        $('flexTable').style.width = $('weekGridTable').offsetWidth + 'px';
+      });
 
       const dayHeadCells = weekDates.map((d, i) =>
         `<th class="num${i >= 5 ? ' weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth()+1}</span></th>`
