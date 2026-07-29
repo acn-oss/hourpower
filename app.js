@@ -2302,6 +2302,7 @@ makeToggle('weekOverviewToggle', 'weekOverviewBody', 'weekOverviewChevron');
 makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
 makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
 makeToggle('rateLineToggle', 'rateLinesSections', 'rateLineChevron');
+makeToggle('hoursCardToggle', 'hoursCardBody', 'hoursCardChevron');
 makeToggle('flexToggle', 'flexBody', 'flexChevron');
 makeToggle('vacSummaryToggle', 'vacSummaryBody', 'vacSummaryChevron');
 makeToggle('archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron');

@@ -79,25 +79,26 @@
     <!-- USER VIEW -->
     <section id="userView" class="view hidden">
       <div class="card">
-        <div class="card-header-row">
-          <h2 id="hoursHeading">Hours this week</h2>
-          <div class="week-nav">
+        <div class="card-header-row card-toggle" id="hoursCardToggle" role="button" tabindex="0" aria-expanded="true">
+          <h2 id="hoursHeading">Hours this week <span class="chevron" id="hoursCardChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
             <button id="weekPrevBtn" class="btn btn-ghost" type="button" aria-label="Previous week">‹</button>
             <span id="weekLabel" class="week-label"></span>
             <button id="weekNextBtn" class="btn btn-ghost" type="button" aria-label="Next week">›</button>
             <button id="weekTodayBtn" class="btn btn-ghost" type="button">This week</button>
           </div>
         </div>
-        <p class="grid-hint" style="margin-bottom:10px">Type hours into a cell and click elsewhere (or press Enter) to save it. Leave a cell empty to clear it.</p>
-
-        <div class="table-wrap">
-          <table class="ledger-table grid-table" id="weekGridTable">
-            <thead><tr id="weekGridHeadRow"></tr></thead>
-            <tbody id="weekGridBody"></tbody>
-            <tfoot id="weekGridFoot"></tfoot>
-          </table>
+        <div id="hoursCardBody" class="collapsible-body">
+          <p class="grid-hint" style="margin-bottom:10px">Type hours into a cell and click elsewhere (or press Enter) to save it. Leave a cell empty to clear it.</p>
+          <div class="table-wrap">
+            <table class="ledger-table grid-table" id="weekGridTable">
+              <thead><tr id="weekGridHeadRow"></tr></thead>
+              <tbody id="weekGridBody"></tbody>
+              <tfoot id="weekGridFoot"></tfoot>
+            </table>
+          </div>
+          <p id="noProjectsState" class="empty-state hidden">You don't have any projects assigned yet — ask your editor to add you to one.</p>
         </div>
-        <p id="noProjectsState" class="empty-state hidden">You don't have any projects assigned yet — ask your editor to add you to one.</p>
       </div>
 
       <div id="flexCard" class="card hidden">
@@ -117,7 +118,7 @@
 
       <div id="vacCard" class="card hidden">
         <div class="card-header-row card-toggle" id="vacSummaryToggle" role="button" tabindex="0" aria-expanded="false">
-          <h2>Vacation &amp; Feriefridag <span class="chevron collapsed" id="vacSummaryChevron">▾</span></h2>
+          <h2>Vacation <span class="chevron collapsed" id="vacSummaryChevron">▾</span></h2>
         </div>
         <div id="vacSummaryBody" class="collapsible-body hidden">
           <div class="table-wrap">
