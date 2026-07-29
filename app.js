@@ -1925,6 +1925,17 @@ function renderWeekGrid() {
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const dateStrs = weekDates.map(toISODate);
 
+  // Shared colgroup: same fixed column widths for grid table and flex table
+  const colgroup = `
+    <col style="width:28px">
+    <col style="width:75px">
+    <col>
+    <col style="width:58px"><col style="width:58px"><col style="width:58px">
+    <col style="width:58px"><col style="width:58px"><col style="width:58px"><col style="width:58px">
+    <col style="width:78px">
+    <col style="width:78px">`;
+  $('weekGridCols').innerHTML = colgroup;
+
   const sortArrow = (key) => userSortKey === key ? (userSortDir === 'asc' ? ' ▲' : ' ▼') : '';
   $('weekGridHeadRow').innerHTML =
     `<th class="toggle-col"></th>` +
@@ -2106,16 +2117,29 @@ function renderWeekGrid() {
         balVals.push(flex !== null && !isFuture ? fmt(balance, true) : '–');
       }
 
-      // Render Flex card
-      const flexHead = ['', ...DAY_LABELS, 'Total week'];
-      $('flexTableHead').innerHTML = flexHead.map(l => `<th class="num">${l}</th>`).join('');
-      $('flexTableBody').innerHTML = [
-        ['Flex',       ...flexVals,  fmt(flexWeekTotal)],
-        ['Difference', ...diffVals,  fmt(diffWeekTotal, true)],
-        ['Balance',    ...balVals,   '']
-      ].map(row => `<tr>${row.map((v, i) => i === 0
-        ? `<td class="flex-label">${v}</td>`
-        : `<td class="num">${v}</td>`).join('')}</tr>`).join('');
+      $('flexTableCols').innerHTML = colgroup;
+
+      const dayHeadCells = weekDates.map((d, i) =>
+        `<th class="num${i >= 5 ? ' weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth()+1}</span></th>`
+      ).join('');
+      $('flexTableHead').innerHTML =
+        `<th class="toggle-col"></th><th></th><th></th>` +
+        dayHeadCells +
+        `<th class="num">Total<span class="day-date">week</span></th><th></th>`;
+
+      const flexRowData = [
+        { label: 'Flex',       vals: flexVals,  total: fn(flexWeekTotal) },
+        { label: 'Difference', vals: diffVals,  total: fn(diffWeekTotal, true) },
+        { label: 'Balance',    vals: balVals,   total: '' }
+      ];
+      $('flexTableBody').innerHTML = flexRowData.map(row => `
+        <tr>
+          <td class="toggle-col"></td><td></td>
+          <td class="flex-label">${row.label}</td>
+          ${row.vals.map((v, i) => `<td class="num${i >= 5 ? ' weekend' : ''}">${v}</td>`).join('')}
+          <td class="num">${row.total}</td>
+          <td></td>
+        </tr>`).join('');
 
       // Render Vacation card
       const weekEnd = addDays(weekStart, 6);
