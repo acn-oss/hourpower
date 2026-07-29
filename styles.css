@@ -1094,3 +1094,7 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   color: var(--ink);
   margin-right: 8px;
 }
+
+.grid-parent-row { background: var(--accent-soft); }
+.grid-parent-row td { font-weight: 500; }
+.grid-parent-toggle { cursor: pointer; margin-right: 5px; font-size: 0.75rem; color: var(--accent-dark); }

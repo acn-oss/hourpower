@@ -58,6 +58,7 @@ let editingProjectUsers = [];
 let projectSortKey = 'code';
 let projectSortDir = 'desc';
 let collapsedParents = new Set();
+let userExpandedParents = new Set(); // empty = all parents collapsed by default in user grid
 
 function getParentIds() {
   return new Set(projectsCache.filter(p => p.parentId).map(p => p.parentId).filter(Boolean));
@@ -1940,16 +1941,25 @@ function renderWeekGrid() {
   });
 
   const parentIds = getParentIds();
-  const visibleProjects = sortItems(projectsCache.filter(p =>
-    p.active !== false &&
-    !parentIds.has(p.id) && // exclude pure parent containers
-    isProjectVisibleToCurrentUser(p)
-  ));
+
+  const activeProjects = projectsCache.filter(p =>
+    p.active !== false && p.status !== 'paused' && isProjectVisibleToCurrentUser(p)
+  );
+  const childrenByParentUser = {};
+  activeProjects.filter(p => p.parentId).forEach(p => {
+    if (!childrenByParentUser[p.parentId]) childrenByParentUser[p.parentId] = [];
+    childrenByParentUser[p.parentId].push(p);
+  });
+  const topLevelProjects = sortItems(activeProjects.filter(p => !p.parentId));
+
   const visibleExtras = EXTRA_TYPES.map(({ type, label }) => ({
     label,
-    items: sortItems((extraCache[type] || []).filter(p => p.active !== false && isProjectVisibleToCurrentUser(p)))
+    items: sortItems((extraCache[type] || []).filter(p =>
+      p.active !== false && p.status !== 'paused' && isProjectVisibleToCurrentUser(p)
+    ))
   }));
-  const hasItems = visibleProjects.length > 0 || visibleExtras.some(g => g.items.length > 0);
+
+  const hasItems = topLevelProjects.length > 0 || visibleExtras.some(g => g.items.length > 0);
   $('noProjectsState').classList.toggle('hidden', hasItems);
   $('weekGridTable').classList.toggle('hidden', !hasItems);
 
@@ -1961,44 +1971,74 @@ function renderWeekGrid() {
     .reduce((s, en) => s + en.hours, 0);
   const colspan = 11;
 
+  const renderInputRow = (p) => {
+    let rowTotal = 0;
+    const cells = dateStrs.map((ds, i) => {
+      const en = entryFor(p.id, ds);
+      const hours = en ? en.hours : 0;
+      rowTotal += hours;
+      return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
+        data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
+    }).join('');
+    return `<tr>
+      <td class="num-col">${projectCodeBadgeHtml(p)}</td>
+      <td>${escapeHtml(p.name)}</td>
+      ${cells}
+      <td class="num row-total">${trimZeros(rowTotal)}</td>
+      <td class="num row-total">${trimZeros(ytdHoursForProject(p.id))}</td>
+    </tr>`;
+  };
+
+  const renderProjectsSection = () => {
+    if (!topLevelProjects.length) return '';
+    let html = `<tr class="grid-section-header"><td colspan="${colspan}">Projects</td></tr>`;
+    topLevelProjects.forEach(p => {
+      if (parentIds.has(p.id)) {
+        const children = (childrenByParentUser[p.id] || [])
+          .sort((a, b) => (a.code || a.name).localeCompare(b.code || b.name));
+        const isExpanded = userExpandedParents.has(p.id);
+        const dayTots = dateStrs.map(ds =>
+          children.reduce((s, c) => { const en = entryFor(c.id, ds); return s + (en ? en.hours : 0); }, 0)
+        );
+        const weekTot = dayTots.reduce((s, n) => s + n, 0);
+        const ytdTot  = children.reduce((s, c) => s + ytdHoursForProject(c.id), 0);
+        const dayCells = dayTots.map((t, i) =>
+          `<td class="${i >= 5 ? 'weekend' : ''}" style="text-align:center;color:var(--ink-soft);font-size:0.82rem">${t > 0 ? trimZeros(t) : ''}</td>`
+        ).join('');
+        html += `<tr class="grid-parent-row">
+          <td class="num-col">
+            <span class="grid-parent-toggle" data-toggle-user-parent="${p.id}">${isExpanded ? '▼' : '▶'}</span>
+            ${projectCodeBadgeHtml(p)}
+          </td>
+          <td>${escapeHtml(p.name)} <span class="optional">(${children.length})</span></td>
+          ${dayCells}
+          <td class="num row-total">${trimZeros(weekTot)}</td>
+          <td class="num row-total">${trimZeros(ytdTot)}</td>
+        </tr>`;
+        if (isExpanded) children.forEach(c => { html += renderInputRow(c); });
+      } else {
+        html += renderInputRow(p);
+      }
+    });
+    return html;
+  };
+
   const renderSection = (items, label) => {
     if (!items.length) return '';
     const header = `<tr class="grid-section-header"><td colspan="${colspan}">${label}</td></tr>`;
-    const rows = items.map(p => {
-      const isPaused = p.status === 'paused';
-      let rowTotal = 0;
-      const cells = dateStrs.map((ds, i) => {
-        const en = entryFor(p.id, ds);
-        const hours = en ? en.hours : 0;
-        rowTotal += hours;
-        return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
-          data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}"
-          ${isPaused ? 'disabled title="This project is paused"' : ''} /></td>`;
-      }).join('');
-      const ytd = ytdHoursForProject(p.id);
-      return `<tr class="${isPaused ? 'proj-paused' : ''}">
-        <td class="num-col">${projectCodeBadgeHtml(p)}</td>
-        <td>${escapeHtml(p.name)}${isPaused ? ' <span class="paused-badge">Paused</span>' : ''}</td>
-        ${cells}
-        <td class="num row-total">${trimZeros(rowTotal)}</td>
-        <td class="num row-total">${trimZeros(ytd)}</td>
-      </tr>`;
-    }).join('');
-    return header + rows;
+    return header + items.map(renderInputRow).join('');
   };
 
   $('weekGridBody').innerHTML =
-    renderSection(visibleProjects, 'Projects') +
+    renderProjectsSection() +
     visibleExtras.map(g => renderSection(g.items, g.label)).join('');
 
   // Absence dropdown row — permanent employees only
   if (currentUser.employeeType === '2') {
-    const absenceOpts = ABSENCE_TYPES.map(t =>
-      `<option value="${t.value}">${t.label}</option>`).join('');
     const absenceCells = dateStrs.map((ds, i) => {
       const a = userAbsencesCache.find(x => x.date === ds);
       const opts = ABSENCE_TYPES.map(t =>
-        `<option value="${t.value}"${a?.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
+        `<option value="${t.value}"${a && a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
       return `<td class="${i >= 5 ? 'weekend' : ''}">
         <select class="absence-select" data-date="${ds}">${opts}</select>
       </td>`;
@@ -2008,15 +2048,20 @@ function renderWeekGrid() {
       <tr class="absence-row"><td colspan="2"></td>${absenceCells}<td></td><td></td></tr>`;
   }
 
-  const allVisible = [...visibleProjects, ...visibleExtras.flatMap(g => g.items)];
+  // All loggable rows for footer totals (children always included even when collapsed)
+  const allLoggable = [
+    ...topLevelProjects.filter(p => !parentIds.has(p.id)),
+    ...Object.values(childrenByParentUser).flat(),
+    ...visibleExtras.flatMap(g => g.items)
+  ];
   const dayTotals = dateStrs.map(ds =>
-    allVisible.reduce((sum, p) => {
+    allLoggable.reduce((sum, p) => {
       const en = entryFor(p.id, ds);
       return sum + (en ? en.hours : 0);
     }, 0)
   );
   const grandTotalWeek = dayTotals.reduce((s, n) => s + n, 0);
-  const grandTotalYTD  = allVisible.reduce((sum, p) => sum + ytdHoursForProject(p.id), 0);
+  const grandTotalYTD  = allLoggable.reduce((sum, p) => sum + ytdHoursForProject(p.id), 0);
   $('weekGridFoot').innerHTML = `<tr class="totals-row"><td colspan="2">Total</td>` +
     dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
     `<td><span class="foot-num">${trimZeros(grandTotalWeek)}</span></td>` +
@@ -2138,6 +2183,15 @@ function renderWeekGrid() {
     }
   }
 }
+
+$('weekGridBody').addEventListener('click', (e) => {
+  const pid = e.target.dataset.toggleUserParent;
+  if (pid) {
+    if (userExpandedParents.has(pid)) userExpandedParents.delete(pid);
+    else userExpandedParents.add(pid);
+    renderWeekGrid();
+  }
+});
 
 $('weekGridBody').addEventListener('change', async (e) => {
   // Absence dropdown
