@@ -2145,8 +2145,8 @@ function renderWeekGrid() {
         <tr>
           <td class="toggle-col"></td><td></td>
           <td class="flex-label">${row.label}</td>
-          ${row.vals.map((v, i) => `<td class="num${i >= 5 ? ' weekend' : ''}">${v}</td>`).join('')}
-          <td class="num">${row.total}</td>
+          ${row.vals.map((v, i) => `<td style="text-align:right;padding-right:6px" class="${i >= 5 ? 'weekend' : ''}">${v}</td>`).join('')}
+          <td style="text-align:right;padding-right:8px">${row.total}</td>
           <td></td>
         </tr>`).join('');
 
