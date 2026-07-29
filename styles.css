@@ -977,10 +977,10 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   white-space: nowrap;
   font-weight: 500;
 }
-.vac-chip.ferielov      { background: #D6EAF8; color: #1A5276; }
-.vac-chip.feriefridag   { background: #D5F5E3; color: #1D6A39; }
-.vac-chip.afspad        { background: #FDEBD0; color: #784212; }
-.vac-chip.sick          { background: #FADBD8; color: #922B21; }
+.vac-chip.ferielov      { background: #FFF9C4; color: #5D4037; }
+.vac-chip.feriefridag   { background: #FFF176; color: #4E342E; }
+.vac-chip.afspad        { background: #FFFDE7; color: #6D4C41; }
+.vac-chip.sick          { background: #FFE082; color: #3E2723; }
 
 /* ==========================================================
    Vacation grid — employees × days
@@ -1104,9 +1104,9 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 
 /* build 202507292305 */
 
-/* Absence dropdown colours by type */
+/* Absence dropdown colours by type — yellow tones */
 .absence-select { transition: background 0.15s, color 0.15s; }
-.absence-select[data-type="afspad"]       { background: #FDEBD0; color: #784212; border-color: #F0B27A; }
-.absence-select[data-type="ferielov"]     { background: #D6EAF8; color: #1A5276; border-color: #85C1E9; }
-.absence-select[data-type="feriefridag"]  { background: #D5F5E3; color: #1D6A39; border-color: #82E0AA; }
-.absence-select[data-type="sick"]         { background: #FADBD8; color: #922B21; border-color: #F1948A; }
+.absence-select[data-type="afspad"]       { background: #FFFDE7; color: #6D4C41; border-color: #FFE082; }
+.absence-select[data-type="ferielov"]     { background: #FFF9C4; color: #5D4037; border-color: #FFD54F; }
+.absence-select[data-type="feriefridag"]  { background: #FFF176; color: #4E342E; border-color: #FFCA28; }
+.absence-select[data-type="sick"]         { background: #FFE082; color: #3E2723; border-color: #FFB300; }
