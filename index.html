@@ -88,6 +88,7 @@
             <button id="weekTodayBtn" class="btn btn-ghost" type="button">This week</button>
           </div>
         </div>
+        <p class="grid-hint" style="margin-bottom:10px">Type hours into a cell and click elsewhere (or press Enter) to save it. Leave a cell empty to clear it.</p>
 
         <div class="table-wrap">
           <table class="ledger-table grid-table" id="weekGridTable">
@@ -97,8 +98,35 @@
           </table>
         </div>
         <p id="noProjectsState" class="empty-state hidden">You don't have any projects assigned yet — ask your editor to add you to one.</p>
-        <p class="grid-hint">Type hours into a cell and click elsewhere (or press Enter) to save it. Leave a cell empty to clear it.</p>
       </div>
+
+      <div id="flexCard" class="card hidden">
+        <div class="card-header-row card-toggle" id="flexToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Flex, Difference &amp; Balance <span class="chevron collapsed" id="flexChevron">▾</span></h2>
+        </div>
+        <div id="flexBody" class="collapsible-body hidden">
+          <div class="table-wrap">
+            <table class="ledger-table" id="flexTable">
+              <thead><tr id="flexTableHead"></tr></thead>
+              <tbody id="flexTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="vacCard" class="card hidden">
+        <div class="card-header-row card-toggle" id="vacSummaryToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Vacation &amp; Feriefridag <span class="chevron collapsed" id="vacSummaryChevron">▾</span></h2>
+        </div>
+        <div id="vacSummaryBody" class="collapsible-body hidden">
+          <div class="table-wrap">
+            <table class="ledger-table" id="vacSummaryTable">
+              <tbody id="vacSummaryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </section>
 
     <!-- EDITOR VIEW -->

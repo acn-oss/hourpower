@@ -1927,6 +1927,7 @@ function renderWeekGrid() {
 
   const sortArrow = (key) => userSortKey === key ? (userSortDir === 'asc' ? ' ▲' : ' ▼') : '';
   $('weekGridHeadRow').innerHTML =
+    `<th class="toggle-col"></th>` +
     `<th class="sortable-th${userSortKey==='code'?' sort-active':''}" data-user-sort="code">No.${sortArrow('code')}</th>` +
     `<th class="sortable-th${userSortKey==='name'?' sort-active':''}" data-user-sort="name">Project${sortArrow('name')}</th>` +
     weekDates.map((d, i) => `<th class="num ${i >= 5 ? 'weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth() + 1}</span></th>`).join('') +
@@ -1969,7 +1970,7 @@ function renderWeekGrid() {
   const ytdHoursForProject = (projectId) => userEntriesCache
     .filter(en => en.projectId === projectId && en.date >= yearStart && en.date <= weekEndStr)
     .reduce((s, en) => s + en.hours, 0);
-  const colspan = 11;
+  const colspan = 12; // toggle + No. + Project + 7 days + Total week + Total YTD
 
   const renderInputRow = (p) => {
     let rowTotal = 0;
@@ -1981,6 +1982,7 @@ function renderWeekGrid() {
         data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
     }).join('');
     return `<tr>
+      <td class="toggle-col"></td>
       <td class="num-col">${projectCodeBadgeHtml(p)}</td>
       <td>${escapeHtml(p.name)}</td>
       ${cells}
@@ -2006,10 +2008,10 @@ function renderWeekGrid() {
           `<td class="${i >= 5 ? 'weekend' : ''}" style="text-align:center;color:var(--ink-soft);font-size:0.82rem">${t > 0 ? trimZeros(t) : ''}</td>`
         ).join('');
         html += `<tr class="grid-parent-row">
-          <td class="num-col">
+          <td class="toggle-col">
             <span class="grid-parent-toggle" data-toggle-user-parent="${p.id}">${isExpanded ? '▼' : '▶'}</span>
-            ${projectCodeBadgeHtml(p)}
           </td>
+          <td class="num-col">${projectCodeBadgeHtml(p)}</td>
           <td>${escapeHtml(p.name)} <span class="optional">(${children.length})</span></td>
           ${dayCells}
           <td class="num row-total">${trimZeros(weekTot)}</td>
@@ -2045,7 +2047,7 @@ function renderWeekGrid() {
     }).join('');
     $('weekGridBody').innerHTML += `
       <tr class="grid-section-header absence-header"><td colspan="${colspan}">Absence</td></tr>
-      <tr class="absence-row"><td colspan="2"></td>${absenceCells}<td></td><td></td></tr>`;
+      <tr class="absence-row"><td class="toggle-col"></td><td colspan="2"></td>${absenceCells}<td></td><td></td></tr>`;
   }
 
   // All loggable rows for footer totals (children always included even when collapsed)
@@ -2062,13 +2064,17 @@ function renderWeekGrid() {
   );
   const grandTotalWeek = dayTotals.reduce((s, n) => s + n, 0);
   const grandTotalYTD  = allLoggable.reduce((sum, p) => sum + ytdHoursForProject(p.id), 0);
-  $('weekGridFoot').innerHTML = `<tr class="totals-row"><td colspan="2">Total</td>` +
+  $('weekGridFoot').innerHTML = `<tr class="totals-row"><td class="toggle-col"></td><td colspan="2">Total</td>` +
     dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
     `<td><span class="foot-num">${trimZeros(grandTotalWeek)}</span></td>` +
     `<td><span class="foot-num">${trimZeros(grandTotalYTD)}</span></td></tr>`;
 
-  // Flex / Difference / Balance rows — permanent position employees only
-  if (currentUser.employeeType === '2') {
+  // Show/hide and populate the Flex and Vacation cards
+  const isPermanent = currentUser.employeeType === '2';
+  $('flexCard').classList.toggle('hidden', !isPermanent);
+  $('vacCard').classList.toggle('hidden', !isPermanent);
+
+  if (isPermanent) {
     const schedule = currentUser.workWeekSchedule || [];
     if (schedule.length) {
       const fmt = (v, sign = false) => {
@@ -2077,111 +2083,67 @@ function renderWeekGrid() {
         if (!sign) return s;
         return v > 0 ? `+${s}` : v < 0 ? `−${s}` : s;
       };
-      const fn = (v, sign = false, cls = '') =>
-        `<span class="foot-num${cls ? ' ' + cls : ''}">${fmt(v, sign)}</span>`;
+      const fn = (v, sign = false) => `<span class="foot-num">${fmt(v, sign)}</span>`;
 
       const prevDayStr = toISODate(addDays(weekStart, -1));
       let balance = computeBalance(prevDayStr, schedule, userEntriesCache) || 0;
-
-      const flexCells = [], diffCells = [], balCells = [];
-      let flexWeekTotal = 0, diffWeekTotal = 0;
       const today = toISODate(new Date());
 
+      const DAY_LABELS = weekDates.map((d, i) => `${DAY_NAMES[i]} ${d.getDate()}/${d.getMonth()+1}`);
+      let flexWeekTotal = 0, diffWeekTotal = 0;
+
+      const flexVals = [], diffVals = [], balVals = [];
       for (let i = 0; i < 7; i++) {
         const ds = dateStrs[i];
         const flex = getFlexHours(ds, schedule);
-        const logged = dayTotals[i];
-        const diff = flex !== null ? logged - flex : null;
+        const diff = flex !== null ? dayTotals[i] - flex : null;
         if (diff !== null) { balance += diff; flexWeekTotal += flex; diffWeekTotal += diff; }
-        const isWE = i >= 5;
         const isFuture = ds > today;
-        flexCells.push(`<td class="${isWE ? 'weekend' : ''}">${fn(flex)}</td>`);
-        diffCells.push(`<td class="${isWE ? 'weekend' : ''}">${fn(diff, true)}</td>`);
-        balCells.push(`<td class="${isWE ? 'weekend' : ''}">${flex !== null && !isFuture ? fn(balance, true) : '<span class="flex-na">–</span>'}</td>`);
+        flexVals.push(fmt(flex));
+        diffVals.push(fmt(diff, true));
+        balVals.push(flex !== null && !isFuture ? fmt(balance, true) : '–');
       }
 
-      $('weekGridFoot').innerHTML += `
-        <tr class="flex-row top-spaced">
-          <td colspan="2" class="flex-label">Flex</td>
-          ${flexCells.join('')}
-          <td>${fn(flexWeekTotal)}</td>
-          <td></td>
-        </tr>
-        <tr class="flex-row diff">
-          <td colspan="2" class="flex-label">Difference</td>
-          ${diffCells.join('')}
-          <td>${fn(diffWeekTotal, true)}</td>
-          <td></td>
-        </tr>
-        <tr class="flex-row balance">
-          <td colspan="2" class="flex-label">Balance</td>
-          ${balCells.join('')}
-          <td></td><td></td>
-        </tr>`;
+      // Render Flex card
+      const flexHead = ['', ...DAY_LABELS, 'Total week'];
+      $('flexTableHead').innerHTML = flexHead.map(l => `<th class="num">${l}</th>`).join('');
+      $('flexTableBody').innerHTML = [
+        ['Flex',       ...flexVals,  fmt(flexWeekTotal)],
+        ['Difference', ...diffVals,  fmt(diffWeekTotal, true)],
+        ['Balance',    ...balVals,   '']
+      ].map(row => `<tr>${row.map((v, i) => i === 0
+        ? `<td class="flex-label">${v}</td>`
+        : `<td class="num">${v}</td>`).join('')}</tr>`).join('');
 
-      // Vacation rows
+      // Render Vacation card
       const weekEnd = addDays(weekStart, 6);
       const ratesData = currentUser.ratesData || {};
       const vacSched = ratesData.vacSchedule || [];
       const vac   = calcVacation(schedule, weekEnd, vacSched, 'vacationRate', 2.08);
       const ferie = calcVacation(schedule, weekEnd, vacSched, 'feriefridageRate', 0.5);
       const fmtDays = (d) => `${trimZeros(Math.round(d * 100) / 100)} d`;
-      const empty7 = dateStrs.map((_, i) => `<td class="${i >= 5 ? 'weekend' : ''}"></td>`).join('');
+      const weekEndStr2 = toISODate(weekEnd);
+      const yearStr = `${weekEnd.getFullYear()}-01-01`;
+      const flUsedYTD   = userAbsencesCache.filter(a => (a.type==='ferielov_full'||a.type==='ferielov_half')&&a.date>=yearStr&&a.date<=weekEndStr2).reduce((s,a)=>s+(a.type==='ferielov_full'?1:0.5),0);
+      const flUsedTotal = userAbsencesCache.filter(a =>  a.type==='ferielov_full'||a.type==='ferielov_half').reduce((s,a)=>s+(a.type==='ferielov_full'?1:0.5),0);
+      const fdUsedYTD   = userAbsencesCache.filter(a => (a.type==='feriefridag_full'||a.type==='feriefridag_half')&&a.date>=yearStr&&a.date<=weekEndStr2).reduce((s,a)=>s+(a.type==='feriefridag_full'?1:0.5),0);
+      const fdUsedTotal = userAbsencesCache.filter(a =>  a.type==='feriefridag_full'||a.type==='feriefridag_half').reduce((s,a)=>s+(a.type==='feriefridag_full'?1:0.5),0);
+      const fmtBal = (e, u) => `${fmtDays(e)} − ${fmtDays(u)} = <strong>${fmtDays(Math.round((e-u)*100)/100)}</strong>`;
 
-      // Calculate used days up to end of viewed week
-      const weekEndStr = toISODate(weekEnd);
-      const yearStartStr = `${weekEnd.getFullYear()}-01-01`;
-      const ferielovUsedYTD = userAbsencesCache
-        .filter(a => (a.type === 'ferielov_full' || a.type === 'ferielov_half') && a.date >= yearStartStr && a.date <= weekEndStr)
-        .reduce((s, a) => s + (a.type === 'ferielov_full' ? 1 : 0.5), 0);
-      const ferielovUsedTotal = userAbsencesCache
-        .filter(a => a.type === 'ferielov_full' || a.type === 'ferielov_half')
-        .reduce((s, a) => s + (a.type === 'ferielov_full' ? 1 : 0.5), 0);
-      const feriedagUsedYTD = userAbsencesCache
-        .filter(a => (a.type === 'feriefridag_full' || a.type === 'feriefridag_half') && a.date >= yearStartStr && a.date <= weekEndStr)
-        .reduce((s, a) => s + (a.type === 'feriefridag_full' ? 1 : 0.5), 0);
-      const feriedagUsedTotal = userAbsencesCache
-        .filter(a => a.type === 'feriefridag_full' || a.type === 'feriefridag_half')
-        .reduce((s, a) => s + (a.type === 'feriefridag_full' ? 1 : 0.5), 0);
-
-      const fmtBalance = (earned, used) => {
-        const net = Math.round((earned - used) * 100) / 100;
-        return `${fmtDays(earned)} − ${fmtDays(used)} = <strong>${fmtDays(net)}</strong>`;
-      };
-
-      $('weekGridFoot').innerHTML += `
-        <tr class="flex-row vac top-spaced">
-          <td class="flex-label">Vac. rate (ferielov)</td>
-          <td class="flex-label">${fmtDays(vac.rate)}/mo</td>
-          ${empty7}<td></td><td></td>
-        </tr>
-        <tr class="flex-row vac">
-          <td colspan="2" class="flex-label">Ferielov YTD</td>
-          ${empty7}<td></td>
-          <td class="flex-label">${fmtBalance(vac.ytd, ferielovUsedYTD)}</td>
-        </tr>
-        <tr class="flex-row vac">
-          <td colspan="2" class="flex-label">Ferielov total</td>
-          ${empty7}<td></td>
-          <td class="flex-label">${fmtBalance(vac.total, ferielovUsedTotal)}</td>
-        </tr>
-        <tr class="flex-row vac top-spaced">
-          <td class="flex-label">Vac. day off rate (feriefridag)</td>
-          <td class="flex-label">${fmtDays(ferie.rate)}/mo</td>
-          ${empty7}<td></td><td></td>
-        </tr>
-        <tr class="flex-row vac">
-          <td colspan="2" class="flex-label">Feriefridag YTD</td>
-          ${empty7}<td></td>
-          <td class="flex-label">${fmtBalance(ferie.ytd, feriedagUsedYTD)}</td>
-        </tr>
-        <tr class="flex-row vac">
-          <td colspan="2" class="flex-label">Feriefridag total</td>
-          ${empty7}<td></td>
-          <td class="flex-label">${fmtBalance(ferie.total, feriedagUsedTotal)}</td>
-        </tr>`;
+      $('vacSummaryTableBody').innerHTML = `
+        <tr><td class="flex-label" style="font-weight:700;padding-top:8px">Vac. rate (ferielov)</td><td class="num">${fmtDays(vac.rate)}/mo</td></tr>
+        <tr><td class="flex-label">Ferielov YTD</td><td class="num">${fmtBal(vac.ytd, flUsedYTD)}</td></tr>
+        <tr><td class="flex-label">Ferielov total</td><td class="num">${fmtBal(vac.total, flUsedTotal)}</td></tr>
+        <tr><td class="flex-label" style="font-weight:700;padding-top:12px">Vac. day off rate (feriefridag)</td><td class="num">${fmtDays(ferie.rate)}/mo</td></tr>
+        <tr><td class="flex-label">Feriefridag YTD</td><td class="num">${fmtBal(ferie.ytd, fdUsedYTD)}</td></tr>
+        <tr><td class="flex-label">Feriefridag total</td><td class="num">${fmtBal(ferie.total, fdUsedTotal)}</td></tr>`;
     }
   }
+    dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
+    `<td><span class="foot-num">${trimZeros(grandTotalWeek)}</span></td>` +
+    `<td><span class="foot-num">${trimZeros(grandTotalYTD)}</span></td></tr>`;
+
+  // Flex / Difference / Balance rows — permanent position employees only
 }
 
 $('weekGridBody').addEventListener('click', (e) => {
@@ -2306,6 +2268,8 @@ makeToggle('weekOverviewToggle', 'weekOverviewBody', 'weekOverviewChevron');
 makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
 makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
 makeToggle('rateLineToggle', 'rateLinesSections', 'rateLineChevron');
+makeToggle('flexToggle', 'flexBody', 'flexChevron');
+makeToggle('vacSummaryToggle', 'vacSummaryBody', 'vacSummaryChevron');
 makeToggle('archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron');
 
 $('archivedUsersTable').addEventListener('click', async (e) => {
