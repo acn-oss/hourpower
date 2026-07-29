@@ -1,5 +1,6 @@
 // ============================================================
-// Hour Power — app.js
+// Hour Power — app.js — build 202507292300
+console.log('Hour Power app.js loaded — build 202507292300');
 // You shouldn't need to edit this file. Project/account
 // settings live in config.js.
 // ============================================================
