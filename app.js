@@ -1944,7 +1944,7 @@ function renderWeekGrid() {
   const parentIds = getParentIds();
 
   const activeProjects = projectsCache.filter(p =>
-    p.active !== false && p.status !== 'paused' && isProjectVisibleToCurrentUser(p)
+    p.active !== false && isProjectVisibleToCurrentUser(p)
   );
   const childrenByParentUser = {};
   activeProjects.filter(p => p.parentId).forEach(p => {
@@ -1956,7 +1956,7 @@ function renderWeekGrid() {
   const visibleExtras = EXTRA_TYPES.map(({ type, label }) => ({
     label,
     items: sortItems((extraCache[type] || []).filter(p =>
-      p.active !== false && p.status !== 'paused' && isProjectVisibleToCurrentUser(p)
+      p.active !== false && isProjectVisibleToCurrentUser(p)
     ))
   }));
 
@@ -1973,18 +1973,20 @@ function renderWeekGrid() {
   const colspan = 12; // toggle + No. + Project + 7 days + Total week + Total YTD
 
   const renderInputRow = (p) => {
+    const isPaused = p.status === 'paused';
     let rowTotal = 0;
     const cells = dateStrs.map((ds, i) => {
       const en = entryFor(p.id, ds);
       const hours = en ? en.hours : 0;
       rowTotal += hours;
       return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
-        data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}" /></td>`;
+        data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}"
+        ${isPaused ? 'disabled title="This project is paused"' : ''} /></td>`;
     }).join('');
-    return `<tr>
+    return `<tr class="${isPaused ? 'proj-paused' : ''}">
       <td class="toggle-col"></td>
       <td class="num-col">${projectCodeBadgeHtml(p)}</td>
-      <td>${escapeHtml(p.name)}</td>
+      <td>${escapeHtml(p.name)}${isPaused ? ' <span class="paused-badge">Paused</span>' : ''}</td>
       ${cells}
       <td class="num row-total">${trimZeros(rowTotal)}</td>
       <td class="num row-total">${trimZeros(ytdHoursForProject(p.id))}</td>
