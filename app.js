@@ -2168,8 +2168,8 @@ function renderWeekGrid() {
         <tr><td class="flex-label">Vacation YTD</td><td class="num">${fmtBal(vac.ytd, flUsedYTD)}</td></tr>
         <tr><td class="flex-label">Vacation total</td><td class="num">${fmtBal(vac.total, flUsedTotal)}</td></tr>
         <tr><td class="flex-label" style="font-weight:700;padding-top:12px">Feriefriday rate</td><td class="num">${fmtDays(ferie.rate)}/mo</td></tr>
-        <tr><td class="flex-label">Vacation day off YTD</td><td class="num">${fmtBal(ferie.ytd, fdUsedYTD)}</td></tr>
-        <tr><td class="flex-label">Vacation day off total</td><td class="num">${fmtBal(ferie.total, fdUsedTotal)}</td></tr>`;
+        <tr><td class="flex-label">Feriefriday YTD</td><td class="num">${fmtBal(ferie.ytd, fdUsedYTD)}</td></tr>
+        <tr><td class="flex-label">Feriefriday total</td><td class="num">${fmtBal(ferie.total, fdUsedTotal)}</td></tr>`;
     }
   }
     dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
