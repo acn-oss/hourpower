@@ -1925,16 +1925,6 @@ function renderWeekGrid() {
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const dateStrs = weekDates.map(toISODate);
 
-  // Shared colgroup: same fixed column widths for grid table and flex table
-  const colgroup = `
-    <col style="width:28px">
-    <col style="width:75px">
-    <col>
-    <col style="width:58px"><col style="width:58px"><col style="width:58px">
-    <col style="width:58px"><col style="width:58px"><col style="width:58px"><col style="width:58px">
-    <col style="width:78px">
-    <col style="width:78px">`;
-
   const sortArrow = (key) => userSortKey === key ? (userSortDir === 'asc' ? ' ▲' : ' ▼') : '';
   $('weekGridHeadRow').innerHTML =
     `<th class="toggle-col"></th>` +
@@ -2115,25 +2105,17 @@ function renderWeekGrid() {
         balVals.push(flex !== null && !isFuture ? fmt(balance, true) : '–');
       }
 
-      $('flexTableCols').innerHTML = colgroup;
-      // After the browser has laid out the grid, copy its column widths to the flex table
-      requestAnimationFrame(() => {
-        const gridThs = $('weekGridTable').querySelectorAll('thead th');
-        const flexCols = $('flexTableCols').querySelectorAll('col');
-        gridThs.forEach((th, i) => {
-          if (flexCols[i]) flexCols[i].style.width = th.offsetWidth + 'px';
-        });
-        $('flexTable').style.tableLayout = 'fixed';
-        $('flexTable').style.width = $('weekGridTable').offsetWidth + 'px';
-      });
+      $('flexTableCols').innerHTML = '';
+      $('flexTable').style.tableLayout = '';
+      $('flexTable').style.width = '';
 
       const dayHeadCells = weekDates.map((d, i) =>
         `<th class="num${i >= 5 ? ' weekend' : ''}">${DAY_NAMES[i]}<span class="day-date">${d.getDate()}/${d.getMonth()+1}</span></th>`
       ).join('');
       $('flexTableHead').innerHTML =
-        `<th class="toggle-col"></th><th></th><th></th>` +
+        `<th style="min-width:120px"></th>` +
         dayHeadCells +
-        `<th class="num">Total<span class="day-date">week</span></th><th></th>`;
+        `<th class="num">Total<span class="day-date">week</span></th>`;
 
       const flexRowData = [
         { label: 'Flex',       vals: flexVals,  total: fn(flexWeekTotal) },
@@ -2142,11 +2124,9 @@ function renderWeekGrid() {
       ];
       $('flexTableBody').innerHTML = flexRowData.map(row => `
         <tr>
-          <td class="toggle-col"></td><td></td>
           <td class="flex-label">${row.label}</td>
           ${row.vals.map((v, i) => `<td style="text-align:right;padding-right:6px" class="${i >= 5 ? 'weekend' : ''}">${v}</td>`).join('')}
           <td style="text-align:right;padding-right:8px">${row.total}</td>
-          <td></td>
         </tr>`).join('');
 
       // Render Vacation card
