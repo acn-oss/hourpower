@@ -462,8 +462,8 @@ input, select, textarea {
 }
 
 .grid-table th, .grid-table td { text-align: center; }
-.grid-table th:first-child, .grid-table td:first-child { text-align: left; }
 .grid-table th:nth-child(2), .grid-table td:nth-child(2) { text-align: left; }
+.grid-table th:nth-child(3), .grid-table td:nth-child(3) { text-align: left; }
 .grid-table thead th.num { text-align: center; }
 .grid-table tfoot td.num { text-align: center; }
 .grid-table tfoot td.right-num { text-align: right; padding-right: 6px; }
