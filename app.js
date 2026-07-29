@@ -1970,6 +1970,10 @@ function renderWeekGrid() {
     .reduce((s, en) => s + en.hours, 0);
   const colspan = 12; // toggle + No. + Project + 7 days + Total week + Total YTD
 
+  // Map of date → absence type for the current user (used to dim inputs and adjust flex calc)
+  const absenceByDate = {};
+  userAbsencesCache.forEach(a => { absenceByDate[a.date] = a.type; });
+
   const renderInputRow = (p) => {
     const isPaused = p.status === 'paused';
     let rowTotal = 0;
@@ -1977,9 +1981,14 @@ function renderWeekGrid() {
       const en = entryFor(p.id, ds);
       const hours = en ? en.hours : 0;
       rowTotal += hours;
-      return `<td class="${i >= 5 ? 'weekend' : ''}"><input type="number" min="0" step="0.25" inputmode="decimal"
-        data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}"
-        ${isPaused ? 'disabled title="This project is paused"' : ''} /></td>`;
+      const absType = absenceByDate[ds];
+      const disabled = isPaused || !!absType;
+      const dimmed = !!absType;
+      return `<td class="${i >= 5 ? 'weekend' : ''}${dimmed ? ' absence-dimmed' : ''}">
+        <input type="number" min="0" step="0.25" inputmode="decimal"
+          data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}"
+          ${disabled ? `disabled title="${isPaused ? 'This project is paused' : 'Absence registered for this day'}"` : ''} />
+      </td>`;
     }).join('');
     return `<tr class="${isPaused ? 'proj-paused' : ''}">
       <td class="toggle-col"></td>
@@ -2095,7 +2104,17 @@ function renderWeekGrid() {
       for (let i = 0; i < 7; i++) {
         const ds = dateStrs[i];
         const flex = getFlexHours(ds, schedule);
-        const diff = flex !== null ? dayTotals[i] - flex : null;
+        const absType = absenceByDate[ds];
+
+        // Effective hours: afspad=0, vacation/sick/day-off fills the flex hours (diff=0)
+        let effective;
+        if (absType) {
+          effective = absType === 'afspad' ? 0 : (flex || 0);
+        } else {
+          effective = dayTotals[i];
+        }
+
+        const diff = flex !== null ? effective - flex : null;
         if (diff !== null) { balance += diff; flexWeekTotal += flex; diffWeekTotal += diff; }
         const isFuture = ds > today;
         flexVals.push(fmt(flex));
@@ -2183,6 +2202,9 @@ $('weekGridBody').addEventListener('change', async (e) => {
         type,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
+      // Delete all hour entries logged for this day
+      const toDelete = userEntriesCache.filter(en => en.date === date);
+      await Promise.all(toDelete.map(en => db.collection('entries').doc(en.id).delete()));
     }
     return;
   }
