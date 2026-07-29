@@ -84,12 +84,12 @@ const EXTRA_TYPES = [
 ];
 
 const ABSENCE_TYPES = [
-  { value: '',                  label: '—'                     },
-  { value: 'ferielov_half',     label: '½ dag ferielov'        },
-  { value: 'ferielov_full',     label: '1 dag ferielov'        },
-  { value: 'feriefridag_half',  label: '½ dag feriefridag'     },
-  { value: 'feriefridag_full',  label: '1 dag feriefridag'     },
-  { value: 'sick',              label: 'Sygedag'               }
+  { value: '',                  label: '—'                                  },
+  { value: 'ferielov_half',     label: '½ day vacation'                     },
+  { value: 'ferielov_full',     label: '1 day vacation'                     },
+  { value: 'feriefridag_half',  label: '½ vacation day off (feriefridag)'   },
+  { value: 'feriefridag_full',  label: '1 vacation day off (feriefridag)'   },
+  { value: 'sick',              label: 'Sygedag'                            }
 ];
 
 // Project category colour palettes — each prefix within a category
@@ -145,8 +145,8 @@ const RATE_SCHEDULES = {
   vac: {
     key: 'vacSchedule',
     fields: [
-      { field: 'vacationRate',      label: 'Ferielov',   defaultVal: 2.08 },
-      { field: 'feriefridageRate',  label: 'Feriefridag', defaultVal: 0.5  }
+      { field: 'vacationRate',      label: 'Vacation',              defaultVal: 2.08 },
+      { field: 'feriefridageRate',  label: 'Day off (feriefridag)', defaultVal: 0.5  }
     ],
     unit: 'd/mo'
   }
@@ -929,7 +929,7 @@ function renderRatesTable() {
       </div>` : '';
 
     const vacSection = isPermanent
-      ? makeSection('vacSchedule', 'Vac. rate (ferielov) & Vac. day off rate (feriefridag)', 'Add')
+      ? makeSection('vacSchedule', 'Vacation rate & Vacation day off (feriefridag) rate', 'Add')
       : '';
 
     return `
@@ -2050,12 +2050,11 @@ function renderWeekGrid() {
   // Absence dropdown row — permanent employees only
   if (currentUser.employeeType === '2') {
     const absenceCells = dateStrs.map((ds, i) => {
+      if (i >= 5) return `<td class="weekend"></td>`;
       const a = userAbsencesCache.find(x => x.date === ds);
       const opts = ABSENCE_TYPES.map(t =>
         `<option value="${t.value}"${a && a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
-      return `<td class="${i >= 5 ? 'weekend' : ''}">
-        <select class="absence-select" data-date="${ds}">${opts}</select>
-      </td>`;
+      return `<td><select class="absence-select" data-date="${ds}">${opts}</select></td>`;
     }).join('');
     $('weekGridBody').innerHTML += `
       <tr class="grid-section-header absence-header"><td colspan="${colspan}">Absence</td></tr>
@@ -2166,12 +2165,12 @@ function renderWeekGrid() {
       const fmtBal = (e, u) => `${fmtDays(e)} − ${fmtDays(u)} = <strong>${fmtDays(Math.round((e-u)*100)/100)}</strong>`;
 
       $('vacSummaryTableBody').innerHTML = `
-        <tr><td class="flex-label" style="font-weight:700;padding-top:8px">Vac. rate (ferielov)</td><td class="num">${fmtDays(vac.rate)}/mo</td></tr>
-        <tr><td class="flex-label">Ferielov YTD</td><td class="num">${fmtBal(vac.ytd, flUsedYTD)}</td></tr>
-        <tr><td class="flex-label">Ferielov total</td><td class="num">${fmtBal(vac.total, flUsedTotal)}</td></tr>
-        <tr><td class="flex-label" style="font-weight:700;padding-top:12px">Vac. day off rate (feriefridag)</td><td class="num">${fmtDays(ferie.rate)}/mo</td></tr>
-        <tr><td class="flex-label">Feriefridag YTD</td><td class="num">${fmtBal(ferie.ytd, fdUsedYTD)}</td></tr>
-        <tr><td class="flex-label">Feriefridag total</td><td class="num">${fmtBal(ferie.total, fdUsedTotal)}</td></tr>`;
+        <tr><td class="flex-label" style="font-weight:700;padding-top:8px">Vacation rate</td><td class="num">${fmtDays(vac.rate)}/mo</td></tr>
+        <tr><td class="flex-label">Vacation YTD</td><td class="num">${fmtBal(vac.ytd, flUsedYTD)}</td></tr>
+        <tr><td class="flex-label">Vacation total</td><td class="num">${fmtBal(vac.total, flUsedTotal)}</td></tr>
+        <tr><td class="flex-label" style="font-weight:700;padding-top:12px">Vacation day off rate (feriefridag)</td><td class="num">${fmtDays(ferie.rate)}/mo</td></tr>
+        <tr><td class="flex-label">Vacation day off YTD</td><td class="num">${fmtBal(ferie.ytd, fdUsedYTD)}</td></tr>
+        <tr><td class="flex-label">Vacation day off total</td><td class="num">${fmtBal(ferie.total, fdUsedTotal)}</td></tr>`;
     }
   }
     dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
