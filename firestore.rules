@@ -46,8 +46,8 @@ service cloud.firestore {
     match /absences/{entryId} {
       allow read: if isSignedIn() && (isEditor() || resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isEditor());
-      allow update: if false;
     }
     match /entries/{entryId} {
       allow read: if isSignedIn() && (isEditor() || resource.data.userId == request.auth.uid);
