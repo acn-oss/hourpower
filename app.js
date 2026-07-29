@@ -84,12 +84,11 @@ const EXTRA_TYPES = [
 ];
 
 const ABSENCE_TYPES = [
-  { value: '',                  label: '—'                                  },
-  { value: 'ferielov_half',     label: '½ day vacation'                     },
-  { value: 'ferielov_full',     label: '1 day vacation'                     },
-  { value: 'feriefridag_half',  label: '½ vacation day off (feriefridag)'   },
-  { value: 'feriefridag_full',  label: '1 vacation day off (feriefridag)'   },
-  { value: 'sick',              label: 'Sygedag'                            }
+  { value: '',            label: '—'                                    },
+  { value: 'afspad',      label: 'Compensatory time off (afspadsering)' },
+  { value: 'ferielov',    label: 'Vacation'                             },
+  { value: 'feriefridag', label: 'Vacation day off (feriefridag)'       },
+  { value: 'sick',        label: 'Sickness'                             }
 ];
 
 // Project category colour palettes — each prefix within a category
@@ -778,11 +777,10 @@ function renderVacationCalendar() {
   });
 
   const TYPE_STYLE = {
-    ferielov_full:     { label: 'F',   bg: '#2E86C1', color: '#fff' },
-    ferielov_half:     { label: '½F',  bg: '#85C1E9', color: '#1A5276' },
-    feriefridag_full:  { label: 'FF',  bg: '#27AE60', color: '#fff' },
-    feriefridag_half:  { label: '½FF', bg: '#82E0AA', color: '#1D6A39' },
-    sick:              { label: 'S',   bg: '#E74C3C', color: '#fff' }
+    afspad:      { label: 'Afspad.',  bg: '#FDEBD0', color: '#784212' },
+    ferielov:    { label: 'Vac.',     bg: '#2E86C1', color: '#fff'    },
+    feriefridag: { label: 'Day off',  bg: '#27AE60', color: '#fff'    },
+    sick:        { label: 'Sick',     bg: '#E74C3C', color: '#fff'    }
   };
 
   const employees = allUsersCache.filter(u => u.active !== false);
@@ -2138,10 +2136,10 @@ function renderWeekGrid() {
       const fmtDays = (d) => `${trimZeros(Math.round(d * 100) / 100)} d`;
       const weekEndStr2 = toISODate(weekEnd);
       const yearStr = `${weekEnd.getFullYear()}-01-01`;
-      const flUsedYTD   = userAbsencesCache.filter(a => (a.type==='ferielov_full'||a.type==='ferielov_half')&&a.date>=yearStr&&a.date<=weekEndStr2).reduce((s,a)=>s+(a.type==='ferielov_full'?1:0.5),0);
-      const flUsedTotal = userAbsencesCache.filter(a =>  a.type==='ferielov_full'||a.type==='ferielov_half').reduce((s,a)=>s+(a.type==='ferielov_full'?1:0.5),0);
-      const fdUsedYTD   = userAbsencesCache.filter(a => (a.type==='feriefridag_full'||a.type==='feriefridag_half')&&a.date>=yearStr&&a.date<=weekEndStr2).reduce((s,a)=>s+(a.type==='feriefridag_full'?1:0.5),0);
-      const fdUsedTotal = userAbsencesCache.filter(a =>  a.type==='feriefridag_full'||a.type==='feriefridag_half').reduce((s,a)=>s+(a.type==='feriefridag_full'?1:0.5),0);
+      const flUsedYTD   = userAbsencesCache.filter(a => a.type==='ferielov' && a.date>=yearStr && a.date<=weekEndStr2).length;
+      const flUsedTotal = userAbsencesCache.filter(a => a.type==='ferielov').length;
+      const fdUsedYTD   = userAbsencesCache.filter(a => a.type==='feriefridag' && a.date>=yearStr && a.date<=weekEndStr2).length;
+      const fdUsedTotal = userAbsencesCache.filter(a => a.type==='feriefridag').length;
       const fmtBal = (e, u) => `${fmtDays(e)} − ${fmtDays(u)} = <strong>${fmtDays(Math.round((e-u)*100)/100)}</strong>`;
 
       $('vacSummaryTableBody').innerHTML = `

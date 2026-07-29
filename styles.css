@@ -977,11 +977,10 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   white-space: nowrap;
   font-weight: 500;
 }
-.vac-chip.ferielov_full,
-.vac-chip.ferielov_half   { background: #D6EAF8; color: #1A5276; }
-.vac-chip.feriefridag_full,
-.vac-chip.feriefridag_half { background: #D5F5E3; color: #1D6A39; }
-.vac-chip.sick             { background: #FADBD8; color: #922B21; }
+.vac-chip.ferielov      { background: #D6EAF8; color: #1A5276; }
+.vac-chip.feriefridag   { background: #D5F5E3; color: #1D6A39; }
+.vac-chip.afspad        { background: #FDEBD0; color: #784212; }
+.vac-chip.sick          { background: #FADBD8; color: #922B21; }
 
 /* ==========================================================
    Vacation grid — employees × days
