@@ -88,9 +88,14 @@ const ABSENCE_TYPES = [
   { value: '',            label: '—'                                    },
   { value: 'afspad',      label: 'Compensatory time off (afspadsering)' },
   { value: 'ferielov',    label: 'Vacation'                             },
-  { value: 'feriefridag', label: 'Feriefriday'       },
-  { value: 'sick',        label: 'Sickness'                             }
+  { value: 'feriefridag', label: 'Feriefriday'                          },
+  { value: 'sick',        label: 'Sickness'                             },
+  { value: 'day_off',     label: 'Day off'                              }
 ];
+const ABSENCE_TYPES_PERMANENT = ABSENCE_TYPES.filter(t =>
+  ['', 'afspad', 'ferielov', 'feriefridag', 'sick'].includes(t.value));
+const ABSENCE_TYPES_OTHER = ABSENCE_TYPES.filter(t =>
+  ['', 'day_off', 'sick'].includes(t.value));
 
 // Project category colour palettes — each prefix within a category
 // gets its own colour; archived > 1 year releases the slot.
@@ -579,7 +584,7 @@ auth.onAuthStateChanged(async (user) => {
   if (currentUser.role === 'user') {
     listenUserEntries();
     listenUserRates();
-    if (currentUser.employeeType === '2') listenUserAbsences();
+    listenUserAbsences();
   } else {
     initExtraTypeCards();
     listenAllEntriesForEditor();
@@ -818,7 +823,8 @@ function renderVacationCalendar() {
     afspad:      { label: 'Afspad.',  bg: '#FFFDE7', color: '#6D4C41' },
     ferielov:    { label: 'Vac.',     bg: '#FFF9C4', color: '#5D4037' },
     feriefridag: { label: 'Feriefriday', bg: '#FFF176', color: '#4E342E' },
-    sick:        { label: 'Sick',     bg: '#FFE082', color: '#3E2723' }
+    sick:        { label: 'Sick',     bg: '#FFE082', color: '#3E2723' },
+    day_off:     { label: 'Day off',  bg: '#FFF9C4', color: '#5D4037' }
   };
 
   const employees = allUsersCache.filter(u => u.active !== false);
@@ -2091,20 +2097,20 @@ function renderWeekGrid() {
     renderProjectsSection() +
     visibleExtras.map(g => renderSection(g.items, g.label)).join('');
 
-  // Absence dropdown row — permanent employees only
-  if (currentUser.employeeType === '2') {
-    const absenceCells = dateStrs.map((ds, i) => {
-      if (i >= 5) return `<td class="weekend"></td>`;
-      if (holidays[ds]) return `<td class="weekend"><span class="holiday-name-cell">${holidays[ds]}</span></td>`;
-      const a = userAbsencesCache.find(x => x.date === ds);
-      const opts = ABSENCE_TYPES.map(t =>
-        `<option value="${t.value}"${a && a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
-      return `<td><select class="absence-select" data-date="${ds}" data-type="${a ? a.type : ''}">${opts}</select></td>`;
-    }).join('');
-    $('weekGridBody').innerHTML += `
-      <tr class="grid-section-header absence-header"><td colspan="${colspan}">Absence</td></tr>
-      <tr class="absence-row"><td class="toggle-col"></td><td colspan="2"></td>${absenceCells}<td></td><td></td></tr>`;
-  }
+  // Absence row — all employees, options differ by employee type
+  const isPermanentUser = currentUser.employeeType === '2';
+  const absenceTypeList = isPermanentUser ? ABSENCE_TYPES_PERMANENT : ABSENCE_TYPES_OTHER;
+  const absenceCells = dateStrs.map((ds, i) => {
+    if (i >= 5) return `<td class="weekend"></td>`;
+    if (holidays[ds]) return `<td class="holiday-cell"><span class="holiday-name-cell">${holidays[ds]}</span></td>`;
+    const a = userAbsencesCache.find(x => x.date === ds);
+    const opts = absenceTypeList.map(t =>
+      `<option value="${t.value}"${a && a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
+    return `<td><select class="absence-select" data-date="${ds}" data-type="${a ? a.type : ''}">${opts}</select></td>`;
+  }).join('');
+  $('weekGridBody').innerHTML += `
+    <tr class="grid-section-header absence-header"><td colspan="${colspan}">Absence</td></tr>
+    <tr class="absence-row"><td class="toggle-col"></td><td colspan="2"></td>${absenceCells}<td></td><td></td></tr>`;
 
   // All loggable rows for footer totals (children always included even when collapsed)
   const allLoggable = [
