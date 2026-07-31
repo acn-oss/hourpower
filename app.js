@@ -45,6 +45,30 @@ let userEntriesCache = [];
 let userAbsencesCache = [];
 let allAbsencesCache = [];
 let allEntriesCache = [];
+let officeCalendarCache = {}; // year string -> { closingDays:[{date,name}], deletedHolidays:[date,...] }
+
+// ---- Office calendar helpers ----
+function getYearCalendar(year) {
+  return officeCalendarCache[String(year)] || { closingDays: [], deletedHolidays: [] };
+}
+function getActiveHolidays(year) {
+  const sys = getDanishHolidays(year);
+  const { deletedHolidays } = getYearCalendar(year);
+  const result = {};
+  Object.entries(sys).forEach(([date, name]) => {
+    if (!deletedHolidays.includes(date)) result[date] = name;
+  });
+  return result;
+}
+function getActiveHolidaysForDates(dateStrs) {
+  const years = [...new Set(dateStrs.map(ds => parseInt(ds.slice(0, 4))))];
+  return Object.assign({}, ...years.map(y => getActiveHolidays(y)));
+}
+function getClosingDayForDate(dateStr) {
+  const year = dateStr.slice(0, 4);
+  const cd = (getYearCalendar(year).closingDays || []).find(c => c.date === dateStr);
+  return cd ? (cd.name || 'Office Closed') : null;
+}
 let allUsersCache = [];
 let archivedUsersCache = [];
 let ratesCache = {};
@@ -581,6 +605,7 @@ auth.onAuthStateChanged(async (user) => {
   $('editorView').classList.toggle('hidden', currentUser.role !== 'editor');
 
   listenProjects();
+  listenOfficeCalendar();
   if (currentUser.role === 'user') {
     listenUserEntries();
     listenUserRates();
@@ -725,6 +750,15 @@ function renderWeekOverview() {
   }).join('');
 }
 
+function listenOfficeCalendar() {
+  db.collection('officeCalendar').onSnapshot(snap => {
+    officeCalendarCache = {};
+    snap.docs.forEach(d => { officeCalendarCache[d.id] = d.data(); });
+    renderWeekGrid();
+    if (currentUser.role === 'editor') renderAbsenceCard();
+  });
+}
+
 function listenUserRates() {
   db.collection('rates').doc(currentUser.uid).onSnapshot(snap => {
     currentUser.ratesData = snap.exists ? snap.data() : {};
@@ -743,8 +777,8 @@ function listenAllAbsences() {
   db.collection('absences').onSnapshot(snap => {
     allAbsencesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderVacationCalendar();
-    if ($('absenceSummaryToggle') && $('absenceSummaryToggle').getAttribute('aria-expanded') === 'true') {
-      renderAbsenceSummary();
+    if ($('absenceCardToggle') && $('absenceCardToggle').getAttribute('aria-expanded') === 'true') {
+      renderAbsenceCard();
     }
   });
 }
@@ -2023,7 +2057,7 @@ function renderWeekGrid() {
   userAbsencesCache.forEach(a => { absenceByDate[a.date] = a.type; });
   console.log('[renderWeekGrid] absenceByDate:', absenceByDate, 'userAbsencesCache length:', userAbsencesCache.length);
 
-  const holidays = getHolidaysForDates(dateStrs);
+  const holidays = getActiveHolidaysForDates(dateStrs);
 
   const renderInputRow = (p) => {
     const isPaused = p.status === 'paused';
@@ -2034,7 +2068,8 @@ function renderWeekGrid() {
       rowTotal += hours;
       const absType = absenceByDate[ds];
       const holiday = holidays[ds];
-      if (holiday) {
+      const closingDay = getClosingDayForDate(ds);
+      if (holiday || closingDay) {
         return `<td class="holiday-cell"></td>`;
       }
       const disabled = isPaused || !!absType;
@@ -2106,6 +2141,8 @@ function renderWeekGrid() {
   const absenceCells = dateStrs.map((ds, i) => {
     if (i >= 5) return `<td class="weekend"></td>`;
     if (holidays[ds]) return `<td class="holiday-cell"><span class="holiday-name-cell">${holidays[ds]}</span></td>`;
+      const closingDay = getClosingDayForDate(ds);
+      if (closingDay) return `<td class="holiday-cell"><span class="holiday-name-cell">${closingDay}</span></td>`;
     const a = userAbsencesCache.find(x => x.date === ds);
     const opts = absenceTypeList.map(t =>
       `<option value="${t.value}"${a && a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
@@ -2163,13 +2200,13 @@ function renderWeekGrid() {
         const flex = getFlexHours(ds, schedule);
         const absType = absenceByDate[ds];
         const holiday = holidays[ds];
+        const closingDay = getClosingDayForDate(ds);
 
-        // Effective hours: afspad=0, vacation/sick/day-off/holiday fills the flex (diff=0)
         let effective;
         if (absType) {
           effective = absType === 'afspad' ? 0 : (flex || 0);
-        } else if (holiday) {
-          effective = flex || 0; // public holiday fills the day, no deduction
+        } else if (holiday || closingDay) {
+          effective = flex || 0; // fills the day, diff = 0
         } else {
           effective = dayTotals[i];
         }
@@ -2219,12 +2256,19 @@ function renderWeekGrid() {
       const flUsedTotal = userAbsencesCache.filter(a => a.type==='ferielov').length;
       const fdUsedYTD   = userAbsencesCache.filter(a => a.type==='feriefridag' && a.date>=yearStr && a.date<=weekEndStr2).length;
       const fdUsedTotal = userAbsencesCache.filter(a => a.type==='feriefridag').length;
+
+      // Office closing days count as vacation for permanent employees
+      const allClosingDays = Object.values(officeCalendarCache).flatMap(y => y.closingDays || []);
+      const closingUsedYTD   = allClosingDays.filter(c => c.date >= yearStr && c.date <= weekEndStr2).length;
+      const closingUsedTotal = allClosingDays.length;
+      const flUsedYTDTotal   = flUsedYTD   + closingUsedYTD;
+      const flUsedTotalTotal = flUsedTotal + closingUsedTotal;
       const fmtBal = (e, u) => `${fmtDays(e)} − ${fmtDays(u)} = <strong>${fmtDays(Math.round((e-u)*100)/100)}</strong>`;
 
       $('vacSummaryTableBody').innerHTML = `
         <tr><td class="flex-label" style="font-weight:700;padding-top:8px">Vacation rate</td><td class="num">${fmtDays(vac.rate)}/mo</td></tr>
-        <tr><td class="flex-label">Vacation YTD</td><td class="num">${fmtBal(vac.ytd, flUsedYTD)}</td></tr>
-        <tr><td class="flex-label">Vacation total</td><td class="num">${fmtBal(vac.total, flUsedTotal)}</td></tr>
+        <tr><td class="flex-label">Vacation YTD</td><td class="num">${fmtBal(vac.ytd, flUsedYTDTotal)}</td></tr>
+        <tr><td class="flex-label">Vacation total</td><td class="num">${fmtBal(vac.total, flUsedTotalTotal)}</td></tr>
         <tr><td class="flex-label" style="font-weight:700;padding-top:12px">Feriefriday rate</td><td class="num">${fmtDays(ferie.rate)}/mo</td></tr>
         <tr><td class="flex-label">Feriefriday YTD</td><td class="num">${fmtBal(ferie.ytd, fdUsedYTD)}</td></tr>
         <tr><td class="flex-label">Feriefriday total</td><td class="num">${fmtBal(ferie.total, fdUsedTotal)}</td></tr>`;
@@ -2365,9 +2409,9 @@ function makeToggle(toggleId, bodyId, chevronId) {
   });
 }
 
-makeToggle('absenceSummaryToggle', 'absenceSummaryBody', 'absenceSummaryChevron');
-$('absenceSummaryToggle').addEventListener('click', () => {
-  if ($('absenceSummaryToggle').getAttribute('aria-expanded') === 'true') renderAbsenceSummary();
+makeToggle('absenceCardToggle', 'absenceCardBody', 'absenceCardChevron');
+$('absenceCardToggle').addEventListener('click', () => {
+  if ($('absenceCardToggle').getAttribute('aria-expanded') === 'true') renderAbsenceCard();
 });
 
 const absSetThisYear = () => {
@@ -2382,19 +2426,145 @@ const absSetLastYear = () => {
   $('absToDate').value   = `${y}-12-31`;
   renderAbsenceSummary();
 };
-const absSetAllTime = () => {
-  $('absFromDate').value = '';
-  $('absToDate').value   = '';
-  renderAbsenceSummary();
-};
+const absSetAllTime  = () => { $('absFromDate').value = ''; $('absToDate').value = ''; renderAbsenceSummary(); };
 $('absThisYear').addEventListener('click', absSetThisYear);
 $('absLastYear').addEventListener('click', absSetLastYear);
 $('absAllTime').addEventListener('click', absSetAllTime);
 $('absFromDate').addEventListener('change', renderAbsenceSummary);
 $('absToDate').addEventListener('change', renderAbsenceSummary);
-
-// Set default to this year
 absSetThisYear();
+
+// Year selector for holiday/closing day management
+(function() {
+  const sel = $('absCalYear');
+  const cur = new Date().getFullYear();
+  for (let y = cur - 1; y <= cur + 3; y++) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    if (y === cur) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener('change', renderAbsenceCalSection);
+})();
+
+$('addClosingDayBtn').addEventListener('click', async () => {
+  const date = $('closingDayDate').value;
+  const name = $('closingDayName').value.trim() || 'Office Closed';
+  const errEl = $('closingDayError');
+  errEl.classList.add('hidden');
+
+  if (!date) { errEl.textContent = 'Please pick a date.'; errEl.classList.remove('hidden'); return; }
+
+  const d = new Date(date + 'T00:00:00');
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) {
+    errEl.textContent = 'Cannot add a closing day on a weekend.'; errEl.classList.remove('hidden'); return;
+  }
+  const yr = d.getFullYear();
+  if (getActiveHolidays(yr)[date]) {
+    errEl.textContent = 'That date is already a public holiday.'; errEl.classList.remove('hidden'); return;
+  }
+
+  const yearData = getYearCalendar(yr);
+  if (yearData.closingDays.some(c => c.date === date)) {
+    errEl.textContent = 'That date is already an office closing day.'; errEl.classList.remove('hidden'); return;
+  }
+
+  const newClosing = [...yearData.closingDays, { date, name }];
+  await db.collection('officeCalendar').doc(String(yr)).set(
+    { closingDays: newClosing }, { merge: true }
+  );
+  $('closingDayDate').value = '';
+  $('closingDayName').value = '';
+  showStamp('Saved');
+});
+
+function renderAbsenceCard() {
+  renderAbsenceSummary();
+  renderAbsenceCalSection();
+}
+
+function renderAbsenceCalSection() {
+  const year = parseInt($('absCalYear').value);
+  const container = $('absCalContent');
+  if (!container) return;
+
+  const sysHolidays = getDanishHolidays(year);
+  const { deletedHolidays, closingDays } = getYearCalendar(year);
+
+  // Holidays table
+  const holidayRows = Object.entries(sysHolidays).map(([date, name]) => {
+    const deleted = deletedHolidays.includes(date);
+    return `<tr class="${deleted ? 'proj-paused' : ''}">
+      <td>${formatDate(date)}</td>
+      <td>${name}${deleted ? ' <span class="paused-badge">Removed</span>' : ''}</td>
+      <td class="row-actions">
+        ${deleted
+          ? `<button class="link-btn" data-restore-holiday="${date}" data-holiday-year="${year}">Restore</button>`
+          : `<button class="link-btn link-danger" data-delete-holiday="${date}" data-holiday-year="${year}">Remove</button>`}
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Closing days table
+  const closingRows = (closingDays || []).sort((a, b) => a.date.localeCompare(b.date)).map(cd => `
+    <tr>
+      <td>${formatDate(cd.date)}</td>
+      <td>${escapeHtml(cd.name || 'Office Closed')}</td>
+      <td class="row-actions">
+        <button class="link-btn link-danger" data-delete-closing="${cd.date}" data-closing-year="${year}">Delete</button>
+      </td>
+    </tr>`).join('');
+
+  container.innerHTML = `
+    <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1;min-width:280px">
+        <h4 style="font-size:0.82rem;font-weight:600;margin:0 0 8px">Public holidays ${year}</h4>
+        <table class="ledger-table">
+          <thead><tr><th>Date</th><th>Name</th><th></th></tr></thead>
+          <tbody>${holidayRows}</tbody>
+        </table>
+      </div>
+      <div style="flex:1;min-width:280px">
+        <h4 style="font-size:0.82rem;font-weight:600;margin:0 0 8px">Office closing days ${year}</h4>
+        ${closingDays && closingDays.length
+          ? `<table class="ledger-table">
+              <thead><tr><th>Date</th><th>Name</th><th></th></tr></thead>
+              <tbody>${closingRows}</tbody>
+            </table>`
+          : `<p class="empty-state">No office closing days added yet.</p>`}
+      </div>
+    </div>`;
+}
+
+// Delegate holiday/closing day actions
+document.addEventListener('click', async (e) => {
+  if (e.target.dataset.deleteHoliday) {
+    const date = e.target.dataset.deleteHoliday;
+    const year = e.target.dataset.holidayYear;
+    const yearData = getYearCalendar(year);
+    await db.collection('officeCalendar').doc(String(year)).set(
+      { deletedHolidays: [...new Set([...yearData.deletedHolidays, date])] }, { merge: true }
+    );
+  }
+  if (e.target.dataset.restoreHoliday) {
+    const date = e.target.dataset.restoreHoliday;
+    const year = e.target.dataset.holidayYear;
+    const yearData = getYearCalendar(year);
+    await db.collection('officeCalendar').doc(String(year)).set(
+      { deletedHolidays: yearData.deletedHolidays.filter(d => d !== date) }, { merge: true }
+    );
+  }
+  if (e.target.dataset.deleteClosing) {
+    const date = e.target.dataset.deleteClosing;
+    const year = e.target.dataset.closingYear;
+    if (!confirm(`Delete closing day on ${formatDate(date)}?`)) return;
+    const yearData = getYearCalendar(year);
+    await db.collection('officeCalendar').doc(String(year)).set(
+      { closingDays: (yearData.closingDays || []).filter(c => c.date !== date) }, { merge: true }
+    );
+  }
+});
 
 function renderAbsenceSummary() {
   const from = $('absFromDate').value || null;

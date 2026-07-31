@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
-<link rel="stylesheet" href="fonts.css?v=202607312121" />
-<link rel="stylesheet" href="styles.css?v=202607312121" />
+<link rel="stylesheet" href="fonts.css?v=202607312145" />
+<link rel="stylesheet" href="styles.css?v=202607312145" />
 </head>
 <body>
 
@@ -154,26 +154,6 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header-row card-toggle" id="absenceSummaryToggle" role="button" tabindex="0" aria-expanded="false">
-          <h2>Absence Summary <span class="chevron collapsed" id="absenceSummaryChevron">▾</span></h2>
-        </div>
-        <div id="absenceSummaryBody" class="collapsible-body hidden">
-          <div class="filters" style="align-items:flex-end;gap:12px">
-            <label>From <input type="date" id="absFromDate" /></label>
-            <label>To <input type="date" id="absToDate" /></label>
-            <button class="btn btn-ghost" id="absThisYear">This year</button>
-            <button class="btn btn-ghost" id="absLastYear">Last year</button>
-            <button class="btn btn-ghost" id="absAllTime">All time</button>
-          </div>
-          <div class="table-wrap" style="margin-top:16px">
-            <table class="ledger-table" id="absenceSummaryTable">
-              <thead><tr id="absenceSummaryHead"></tr></thead>
-              <tbody id="absenceSummaryBody2"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
 
       <div class="card">
         <div class="card-header-row">
@@ -352,6 +332,53 @@
         </div>
       </div>
 
+      <!-- ====== ABSENCE CARD ====== -->
+      <div class="card">
+        <div class="card-header-row card-toggle" id="absenceCardToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Absence <span class="chevron collapsed" id="absenceCardChevron">▾</span></h2>
+        </div>
+        <div id="absenceCardBody" class="collapsible-body hidden">
+
+          <!-- Summary section -->
+          <h3 class="section-sub-heading">Summary</h3>
+          <div class="filters" style="align-items:flex-end;gap:12px">
+            <label>From <input type="date" id="absFromDate" /></label>
+            <label>To   <input type="date" id="absToDate"   /></label>
+            <button class="btn btn-ghost" id="absThisYear">This year</button>
+            <button class="btn btn-ghost" id="absLastYear">Last year</button>
+            <button class="btn btn-ghost" id="absAllTime">All time</button>
+          </div>
+          <div class="table-wrap" style="margin-top:12px">
+            <table class="ledger-table" id="absenceSummaryTable">
+              <thead><tr id="absenceSummaryHead"></tr></thead>
+              <tbody id="absenceSummaryBody2"></tbody>
+            </table>
+          </div>
+
+          <!-- Holidays & closing days section -->
+          <h3 class="section-sub-heading" style="margin-top:28px">Holidays &amp; Office Closing Days</h3>
+          <div class="filters" style="gap:12px;align-items:flex-end">
+            <label>Year
+              <select id="absCalYear" style="width:100px"></select>
+            </label>
+          </div>
+          <div id="absCalContent" style="margin-top:12px"></div>
+          <div class="stacked-form" style="margin-top:16px;max-width:420px">
+            <h4 style="margin:0 0 8px;font-size:0.82rem;font-weight:600">Add office closing day</h4>
+            <div class="field-row" style="gap:12px;flex-wrap:nowrap;align-items:flex-end">
+              <label style="flex:0 0 auto">Date
+                <input type="date" id="closingDayDate" style="width:140px" />
+              </label>
+              <label style="flex:1">Name <span class="optional">optional</span>
+                <input type="text" id="closingDayName" placeholder="Office Closed" />
+              </label>
+              <button type="button" id="addClosingDayBtn" class="btn btn-primary" style="flex:0 0 auto">Add</button>
+            </div>
+            <p id="closingDayError" class="empty-state hidden" style="color:#c0392b;margin-top:4px"></p>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header-row card-toggle" id="allEntriesToggle" role="button" tabindex="0" aria-expanded="false">
           <h2>All entries <span class="chevron collapsed" id="allEntriesChevron">▾</span></h2>
@@ -431,7 +458,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202607312121"></script>
-<script src="app.js?v=202607312121"></script>
+<script src="config.js?v=202607312145"></script>
+<script src="app.js?v=202607312145"></script>
 </body>
 </html>
