@@ -226,6 +226,41 @@ function weekRangeLabel(start) {
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
+function getEasterSunday(year) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day   = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+function getDanishHolidays(year) {
+  const easter = getEasterSunday(year);
+  const s = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return toISODate(r); };
+  return {
+    [s(easter, -3)]:     'Skærtorsdag',
+    [s(easter, -2)]:     'Langfredag',
+    [toISODate(easter)]: 'Påskedag',
+    [s(easter,  1)]:     'Anden påskedag',
+    [s(easter, 39)]:     'Kristi himmelfartsdag',
+    [s(easter, 49)]:     'Pinsedag',
+    [s(easter, 50)]:     'Anden pinsedag',
+    [`${year}-12-24`]:   'Juleaften',
+    [`${year}-12-25`]:   'Juledag',
+    [`${year}-12-26`]:   'Anden juledag',
+    [`${year}-12-31`]:   'Nytårsaften',
+    [`${year}-01-01`]:   'Nytårsdag',
+  };
+}
+function getHolidaysForDates(dateStrs) {
+  const years = [...new Set(dateStrs.map(ds => parseInt(ds.slice(0, 4))))];
+  return Object.assign({}, ...years.map(y => getDanishHolidays(y)));
+}
+
 function isoWeekNumber(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -777,6 +812,8 @@ function renderVacationCalendar() {
     absByUser[a.userId][a.date] = a.type;
   });
 
+  const calHolidays = getHolidaysForDates(days.map(d => d.ds));
+
   const TYPE_STYLE = {
     afspad:      { label: 'Afspad.',  bg: '#FFFDE7', color: '#6D4C41' },
     ferielov:    { label: 'Vac.',     bg: '#FFF9C4', color: '#5D4037' },
@@ -802,21 +839,29 @@ function renderVacationCalendar() {
 
   const dayHeaderRow = `<tr>
     <th class="vac-name-col vac-name"></th>
-    ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}${d.isNewMonth ? ' vac-new-month' : ''}">
+    ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}${d.isNewMonth ? ' vac-new-month' : ''}${calHolidays[d.ds] ? ' vac-holiday-col' : ''}">
       <div class="vac-day-num">${d.num}</div>
     </th>`).join('')}
+  </tr>`;
+
+  const holidayRow = `<tr>
+    <th class="vac-name vac-holiday-label">Holiday</th>
+    ${days.map(d => {
+      const h = calHolidays[d.ds];
+      return `<td class="vac-cell vac-holiday-cell${d.isWE ? ' vac-we' : ''}${d.isNewMonth ? ' vac-new-month' : ''}"
+        title="${h || ''}">${h ? `<span class="vac-holiday-chip">${h}</span>` : ''}</td>`;
+    }).join('')}
   </tr>`;
 
   const bodyRows = employees.map(u => {
     const userAbs = absByUser[u.uid] || {};
     const cells = days.map(d => {
       const type = userAbs[d.ds];
+      const h    = calHolidays[d.ds];
       const s    = type ? TYPE_STYLE[type] : null;
-      const bg   = d.isWE ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
-      const style = s
-        ? `background:${s.bg};color:${s.color}`
-        : bg ? `background:${bg}` : '';
-      const title = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : '';
+      const bg   = h ? '#FFFDE7' : d.isWE ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
+      const style = s ? `background:${s.bg};color:${s.color}` : bg ? `background:${bg}` : '';
+      const title = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : (h || '');
       return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="${style}" title="${title}">${s ? s.label : ''}</td>`;
     }).join('');
     return `<tr><th class="vac-name">${escapeHtml(u.name)}</th>${cells}</tr>`;
@@ -826,7 +871,7 @@ function renderVacationCalendar() {
     <div class="vac-scroll">
       <table class="vac-grid">
         <thead>${monthHeaderRow}${weekHeaderRow}${dayHeaderRow}</thead>
-        <tbody>${bodyRows}</tbody>
+        <tbody>${holidayRow}${bodyRows}</tbody>
       </table>
     </div>`;
 }
@@ -1976,6 +2021,8 @@ function renderWeekGrid() {
   userAbsencesCache.forEach(a => { absenceByDate[a.date] = a.type; });
   console.log('[renderWeekGrid] absenceByDate:', absenceByDate, 'userAbsencesCache length:', userAbsencesCache.length);
 
+  const holidays = getHolidaysForDates(dateStrs);
+
   const renderInputRow = (p) => {
     const isPaused = p.status === 'paused';
     let rowTotal = 0;
@@ -1984,12 +2031,14 @@ function renderWeekGrid() {
       const hours = en ? en.hours : 0;
       rowTotal += hours;
       const absType = absenceByDate[ds];
-      const disabled = isPaused || !!absType;
-      const dimmed = !!absType;
-      return `<td class="${i >= 5 ? 'weekend' : ''}${dimmed ? ' absence-dimmed' : ''}">
+      const holiday = holidays[ds];
+      const disabled = isPaused || !!absType || !!holiday;
+      const dimmed = !!absType || !!holiday;
+      const title = holiday ? holiday : (isPaused ? 'This project is paused' : 'Absence registered for this day');
+      return `<td class="${i >= 5 ? 'weekend' : ''}${dimmed ? ' absence-dimmed' : ''}${holiday ? ' holiday-cell' : ''}">
         <input type="number" min="0" step="0.25" inputmode="decimal"
           data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}"
-          ${disabled ? `disabled title="${isPaused ? 'This project is paused' : 'Absence registered for this day'}"` : ''} />
+          ${disabled ? `disabled title="${title}"` : ''} />
       </td>`;
     }).join('');
     return `<tr class="${isPaused ? 'proj-paused' : ''}">
@@ -2107,11 +2156,14 @@ function renderWeekGrid() {
         const ds = dateStrs[i];
         const flex = getFlexHours(ds, schedule);
         const absType = absenceByDate[ds];
+        const holiday = holidays[ds];
 
-        // Effective hours: afspad=0, vacation/sick/day-off fills the flex hours (diff=0)
+        // Effective hours: afspad=0, vacation/sick/day-off/holiday fills the flex (diff=0)
         let effective;
         if (absType) {
           effective = absType === 'afspad' ? 0 : (flex || 0);
+        } else if (holiday) {
+          effective = flex || 0; // public holiday fills the day, no deduction
         } else {
           effective = dayTotals[i];
         }
