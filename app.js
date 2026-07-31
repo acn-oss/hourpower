@@ -839,30 +839,23 @@ function renderVacationCalendar() {
 
   const dayHeaderRow = `<tr>
     <th class="vac-name-col vac-name"></th>
-    ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}${d.isNewMonth ? ' vac-new-month' : ''}${calHolidays[d.ds] ? ' vac-holiday-col' : ''}">
+    ${days.map(d => `<th class="vac-col-day${d.isWE || calHolidays[d.ds] ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}${d.isNewMonth ? ' vac-new-month' : ''}">
       <div class="vac-day-num">${d.num}</div>
     </th>`).join('')}
-  </tr>`;
-
-  const holidayRow = `<tr>
-    <th class="vac-name vac-holiday-label">Holiday</th>
-    ${days.map(d => {
-      const h = calHolidays[d.ds];
-      return `<td class="vac-cell vac-holiday-cell${d.isWE ? ' vac-we' : ''}${d.isNewMonth ? ' vac-new-month' : ''}"
-        title="${h || ''}">${h ? `<span class="vac-holiday-chip">${h}</span>` : ''}</td>`;
-    }).join('')}
   </tr>`;
 
   const bodyRows = employees.map(u => {
     const userAbs = absByUser[u.uid] || {};
     const cells = days.map(d => {
-      const type = userAbs[d.ds];
-      const h    = calHolidays[d.ds];
-      const s    = type ? TYPE_STYLE[type] : null;
-      const bg   = h ? '#FFFDE7' : d.isWE ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
-      const style = s ? `background:${s.bg};color:${s.color}` : bg ? `background:${bg}` : '';
-      const title = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : (h || '');
-      return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="${style}" title="${title}">${s ? s.label : ''}</td>`;
+      const type    = userAbs[d.ds];
+      const holiday = calHolidays[d.ds];
+      const s       = type ? TYPE_STYLE[type] : null;
+      const isGrey  = d.isWE || !!holiday;
+      const bg      = isGrey ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
+      const style   = s ? `background:${s.bg};color:${s.color}` : bg ? `background:${bg}` : '';
+      const label   = s ? s.label : (holiday ? `<span class="holiday-name-cell" style="font-size:0.6rem">${holiday}</span>` : '');
+      const title   = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : (holiday || '');
+      return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="${style}" title="${title}">${label}</td>`;
     }).join('');
     return `<tr><th class="vac-name">${escapeHtml(u.name)}</th>${cells}</tr>`;
   }).join('');
@@ -871,7 +864,7 @@ function renderVacationCalendar() {
     <div class="vac-scroll">
       <table class="vac-grid">
         <thead>${monthHeaderRow}${weekHeaderRow}${dayHeaderRow}</thead>
-        <tbody>${holidayRow}${bodyRows}</tbody>
+        <tbody>${bodyRows}</tbody>
       </table>
     </div>`;
 }
@@ -2032,10 +2025,15 @@ function renderWeekGrid() {
       rowTotal += hours;
       const absType = absenceByDate[ds];
       const holiday = holidays[ds];
-      const disabled = isPaused || !!absType || !!holiday;
-      const dimmed = !!absType || !!holiday;
-      const title = holiday ? holiday : (isPaused ? 'This project is paused' : 'Absence registered for this day');
-      return `<td class="${i >= 5 ? 'weekend' : ''}${dimmed ? ' absence-dimmed' : ''}${holiday ? ' holiday-cell' : ''}">
+      if (holiday) {
+        return `<td class="weekend" title="${holiday}">
+          <span class="holiday-name-cell">${holiday}</span>
+        </td>`;
+      }
+      const disabled = isPaused || !!absType;
+      const dimmed = !!absType;
+      const title = isPaused ? 'This project is paused' : 'Absence registered for this day';
+      return `<td class="${i >= 5 ? 'weekend' : ''}${dimmed ? ' absence-dimmed' : ''}">
         <input type="number" min="0" step="0.25" inputmode="decimal"
           data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}"
           ${disabled ? `disabled title="${title}"` : ''} />
@@ -2099,6 +2097,7 @@ function renderWeekGrid() {
   if (currentUser.employeeType === '2') {
     const absenceCells = dateStrs.map((ds, i) => {
       if (i >= 5) return `<td class="weekend"></td>`;
+      if (holidays[ds]) return `<td class="weekend"><span class="holiday-name-cell">${holidays[ds]}</span></td>`;
       const a = userAbsencesCache.find(x => x.date === ds);
       const opts = ABSENCE_TYPES.map(t =>
         `<option value="${t.value}"${a && a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');

@@ -1126,3 +1126,12 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   text-overflow: ellipsis;
   max-width: 56px;
 }
+
+.holiday-name-cell {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--ink-soft);
+  text-align: center;
+  line-height: 1.2;
+  padding: 2px 1px;
+}
