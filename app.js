@@ -242,18 +242,18 @@ function getDanishHolidays(year) {
   const easter = getEasterSunday(year);
   const s = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return toISODate(r); };
   return {
-    [s(easter, -3)]:     'Skærtorsdag',
-    [s(easter, -2)]:     'Langfredag',
-    [toISODate(easter)]: 'Påskedag',
-    [s(easter,  1)]:     'Anden påskedag',
-    [s(easter, 39)]:     'Kristi himmelfartsdag',
-    [s(easter, 49)]:     'Pinsedag',
-    [s(easter, 50)]:     'Anden pinsedag',
-    [`${year}-12-24`]:   'Juleaften',
-    [`${year}-12-25`]:   'Juledag',
-    [`${year}-12-26`]:   'Anden juledag',
-    [`${year}-12-31`]:   'Nytårsaften',
-    [`${year}-01-01`]:   'Nytårsdag',
+    [s(easter, -3)]:     'Ea. Thu',
+    [s(easter, -2)]:     'Ea. Fri',
+    [toISODate(easter)]: 'Ea. Sun',
+    [s(easter,  1)]:     'Ea. Mon',
+    [s(easter, 39)]:     'Ascension',
+    [s(easter, 49)]:     'Whit Sun',
+    [s(easter, 50)]:     'Whit Mon',
+    [`${year}-12-24`]:   'Xmas Eve',
+    [`${year}-12-25`]:   'Xmas Day',
+    [`${year}-12-26`]:   '2nd Xmas',
+    [`${year}-12-31`]:   'NYE',
+    [`${year}-01-01`]:   'NYD',
   };
 }
 function getHolidaysForDates(dateStrs) {
@@ -839,7 +839,7 @@ function renderVacationCalendar() {
 
   const dayHeaderRow = `<tr>
     <th class="vac-name-col vac-name"></th>
-    ${days.map(d => `<th class="vac-col-day${d.isWE || calHolidays[d.ds] ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}${d.isNewMonth ? ' vac-new-month' : ''}">
+    ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}${d.isNewMonth ? ' vac-new-month' : ''}"${calHolidays[d.ds] ? ' style="background:#EDEEE9"' : ''}>
       <div class="vac-day-num">${d.num}</div>
     </th>`).join('')}
   </tr>`;
@@ -851,7 +851,7 @@ function renderVacationCalendar() {
       const holiday = calHolidays[d.ds];
       const s       = type ? TYPE_STYLE[type] : null;
       const isGrey  = d.isWE || !!holiday;
-      const bg      = isGrey ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
+      const bg      = holiday ? '#EDEEE9' : isGrey ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
       const style   = s ? `background:${s.bg};color:${s.color}` : bg ? `background:${bg}` : '';
       const label   = s ? s.label : (holiday ? `<span class="holiday-name-cell" style="font-size:0.6rem">${holiday}</span>` : '');
       const title   = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : (holiday || '');
@@ -2026,9 +2026,7 @@ function renderWeekGrid() {
       const absType = absenceByDate[ds];
       const holiday = holidays[ds];
       if (holiday) {
-        return `<td class="weekend" title="${holiday}">
-          <span class="holiday-name-cell">${holiday}</span>
-        </td>`;
+        return `<td class="holiday-cell"></td>`;
       }
       const disabled = isPaused || !!absType;
       const dimmed = !!absType;
