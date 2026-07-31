@@ -743,6 +743,9 @@ function listenAllAbsences() {
   db.collection('absences').onSnapshot(snap => {
     allAbsencesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderVacationCalendar();
+    if ($('absenceSummaryToggle') && $('absenceSummaryToggle').getAttribute('aria-expanded') === 'true') {
+      renderAbsenceSummary();
+    }
   });
 }
 
@@ -2362,7 +2365,80 @@ function makeToggle(toggleId, bodyId, chevronId) {
   });
 }
 
-makeToggle('allEntriesToggle', 'allEntriesBody', 'allEntriesChevron');
+makeToggle('absenceSummaryToggle', 'absenceSummaryBody', 'absenceSummaryChevron');
+$('absenceSummaryToggle').addEventListener('click', () => {
+  if ($('absenceSummaryToggle').getAttribute('aria-expanded') === 'true') renderAbsenceSummary();
+});
+
+const absSetThisYear = () => {
+  const y = new Date().getFullYear();
+  $('absFromDate').value = `${y}-01-01`;
+  $('absToDate').value   = `${y}-12-31`;
+  renderAbsenceSummary();
+};
+const absSetLastYear = () => {
+  const y = new Date().getFullYear() - 1;
+  $('absFromDate').value = `${y}-01-01`;
+  $('absToDate').value   = `${y}-12-31`;
+  renderAbsenceSummary();
+};
+const absSetAllTime = () => {
+  $('absFromDate').value = '';
+  $('absToDate').value   = '';
+  renderAbsenceSummary();
+};
+$('absThisYear').addEventListener('click', absSetThisYear);
+$('absLastYear').addEventListener('click', absSetLastYear);
+$('absAllTime').addEventListener('click', absSetAllTime);
+$('absFromDate').addEventListener('change', renderAbsenceSummary);
+$('absToDate').addEventListener('change', renderAbsenceSummary);
+
+// Set default to this year
+absSetThisYear();
+
+function renderAbsenceSummary() {
+  const from = $('absFromDate').value || null;
+  const to   = $('absToDate').value   || null;
+
+  const COLS = [
+    { value: 'afspad',      label: 'Comp. time off' },
+    { value: 'ferielov',    label: 'Vacation'        },
+    { value: 'feriefridag', label: 'Feriefriday'     },
+    { value: 'sick',        label: 'Sickness'        },
+    { value: 'day_off',     label: 'Day off'         }
+  ];
+
+  const filtered = allAbsencesCache.filter(a =>
+    (!from || a.date >= from) && (!to || a.date <= to)
+  );
+
+  // Build totals per user per type
+  const byUser = {};
+  filtered.forEach(a => {
+    if (!byUser[a.userId]) byUser[a.userId] = { userName: a.userName };
+    byUser[a.userId][a.value] = (byUser[a.userId][a.value] || 0) + 1;
+    byUser[a.userId][a.type]  = (byUser[a.userId][a.type]  || 0) + 1;
+  });
+
+  // Merge with allUsersCache to include employees with zero absences
+  const rows = allUsersCache.map(u => {
+    const data = byUser[u.uid] || {};
+    const total = COLS.reduce((s, c) => s + (data[c.value] || 0), 0);
+    return { name: u.name, data, total };
+  });
+
+  $('absenceSummaryHead').innerHTML =
+    '<th>Employee</th>' +
+    COLS.map(c => `<th class="num">${c.label}</th>`).join('') +
+    '<th class="num">Total</th>';
+
+  $('absenceSummaryBody2').innerHTML = rows.map(r => `
+    <tr>
+      <td>${escapeHtml(r.name)}</td>
+      ${COLS.map(c => `<td class="num">${r.data[c.value] ? r.data[c.value] + ' d' : '—'}</td>`).join('')}
+      <td class="num">${r.total ? `<strong>${r.total} d</strong>` : '—'}</td>
+    </tr>`).join('');
+}
 makeToggle('weekOverviewToggle', 'weekOverviewBody', 'weekOverviewChevron');
 makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
 makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');

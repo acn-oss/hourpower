@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
-<link rel="stylesheet" href="fonts.css?v=202607312059" />
-<link rel="stylesheet" href="styles.css?v=202607312059" />
+<link rel="stylesheet" href="fonts.css?v=202607312121" />
+<link rel="stylesheet" href="styles.css?v=202607312121" />
 </head>
 <body>
 
@@ -151,6 +151,27 @@
         </div>
         <div id="vacationBody" class="collapsible-body">
           <div id="vacationCalendar"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="absenceSummaryToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Absence Summary <span class="chevron collapsed" id="absenceSummaryChevron">▾</span></h2>
+        </div>
+        <div id="absenceSummaryBody" class="collapsible-body hidden">
+          <div class="filters" style="align-items:flex-end;gap:12px">
+            <label>From <input type="date" id="absFromDate" /></label>
+            <label>To <input type="date" id="absToDate" /></label>
+            <button class="btn btn-ghost" id="absThisYear">This year</button>
+            <button class="btn btn-ghost" id="absLastYear">Last year</button>
+            <button class="btn btn-ghost" id="absAllTime">All time</button>
+          </div>
+          <div class="table-wrap" style="margin-top:16px">
+            <table class="ledger-table" id="absenceSummaryTable">
+              <thead><tr id="absenceSummaryHead"></tr></thead>
+              <tbody id="absenceSummaryBody2"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -410,7 +431,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202607312059"></script>
-<script src="app.js?v=202607312059"></script>
+<script src="config.js?v=202607312121"></script>
+<script src="app.js?v=202607312121"></script>
 </body>
 </html>
