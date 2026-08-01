@@ -965,7 +965,10 @@ function renderVacationCalendar() {
       const bg      = s ? s.bg : work ? work.color : isGrey ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
       const clr     = s ? s.color : work ? (work.textColor || '#fff') : '';
       const style   = bg ? `background:${bg};${clr ? `color:${clr}` : ''}` : '';
-      const label   = s ? s.label : (holiday ? `<span class="holiday-name-cell" style="font-size:0.6rem">${holiday}</span>` : '');
+      const label   = s ? s.label
+        : holiday ? `<span class="holiday-name-cell" style="font-size:0.6rem">${holiday}</span>`
+        : work ? `<span style="font-size:0.62rem;font-weight:600;overflow:hidden;display:block;line-height:1.1">${work.name.slice(0, 7)}</span>`
+        : '';
       const title   = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : (holiday || (work ? work.name : ''));
       return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="${style}" title="${title}">${label}</td>`;
     }).join('');
