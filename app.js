@@ -2500,6 +2500,16 @@ absSetThisYear();
   sel.addEventListener('change', renderAbsenceCalSection);
 })();
 
+$('absCalAddYear').addEventListener('click', () => {
+  const sel = $('absCalYear');
+  const lastYear = parseInt(sel.options[sel.options.length - 1].value);
+  const o = document.createElement('option');
+  o.value = lastYear + 1; o.textContent = lastYear + 1;
+  sel.appendChild(o);
+  sel.value = lastYear + 1;
+  renderAbsenceCalSection();
+});
+
 $('addClosingDayBtn').addEventListener('click', async () => {
   const date = $('closingDayDate').value;
   const errEl = $('closingDayError');
@@ -2547,7 +2557,10 @@ function renderAbsenceCalSection() {
   const sysHolidays = getDanishHolidays(year);
   const { deletedHolidays, closingDays, holidayOverrides } = getYearCalendar(year);
 
-  // Holidays table with Danish name, Edit, Delete with confirm
+  const DAY_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayName = (dateStr) => DAY_SHORT[new Date(dateStr + 'T00:00:00').getDay()];
+
+  // Holidays table with Danish name, Day, Edit, Delete with confirm
   const holidayRows = Object.entries(sysHolidays).map(([origDate, origName]) => {
     const ov = holidayOverrides[origDate] || {};
     const dispDate = ov.date || origDate;
@@ -2557,6 +2570,7 @@ function renderAbsenceCalSection() {
     if (deleted) {
       return `<tr class="proj-paused">
         <td>${formatDate(origDate)}</td>
+        <td style="color:var(--ink-soft)">${dayName(origDate)}</td>
         <td>${origName} <span class="paused-badge">Deleted</span></td>
         <td>${danishName}</td>
         <td class="row-actions">
@@ -2566,6 +2580,7 @@ function renderAbsenceCalSection() {
     }
     return `<tr>
       <td>${formatDate(dispDate)}</td>
+      <td style="color:var(--ink-soft)">${dayName(dispDate)}</td>
       <td>${escapeHtml(dispName)}</td>
       <td style="color:var(--ink-soft)">${danishName}</td>
       <td class="row-actions">
@@ -2609,7 +2624,7 @@ function renderAbsenceCalSection() {
       <div style="flex:1;min-width:300px">
         <h4 style="font-size:0.82rem;font-weight:600;margin:0 0 8px">Public holidays ${year}</h4>
         <table class="ledger-table">
-          <thead><tr><th>Date</th><th>English</th><th>Danish</th><th></th></tr></thead>
+          <thead><tr><th>Date</th><th>Day</th><th>English</th><th>Danish</th><th></th></tr></thead>
           <tbody>${holidayRows}</tbody>
         </table>
       </div>

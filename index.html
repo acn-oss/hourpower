@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
-<link rel="stylesheet" href="fonts.css?v=202608010536" />
-<link rel="stylesheet" href="styles.css?v=202608010536" />
+<link rel="stylesheet" href="fonts.css?v=202608010551" />
+<link rel="stylesheet" href="styles.css?v=202608010551" />
 </head>
 <body>
 
@@ -138,22 +138,6 @@
         <a href="https://docs.google.com/spreadsheets/d/1nR_B6JsfZ6MIl-L7hv2g91BCxsyiIwEsxjM6EhoGL6s/edit?gid=0#gid=0"
            target="_blank" rel="noopener noreferrer" class="btn btn-ghost">Wish list ↗</a>
       </div>
-
-      <div class="card">
-        <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="true">
-          <h2>Calendar <span class="chevron" id="vacationChevron">▾</span></h2>
-          <div class="week-nav" onclick="event.stopPropagation()">
-            <button id="vacCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
-            <span id="vacCalLabel" class="week-label"></span>
-            <button id="vacCalNextBtn" class="btn btn-ghost" type="button">›</button>
-            <button id="vacCalTodayBtn" class="btn btn-ghost" type="button">This month</button>
-          </div>
-        </div>
-        <div id="vacationBody" class="collapsible-body">
-          <div id="vacationCalendar"></div>
-        </div>
-      </div>
-
 
       <div class="card">
         <div class="card-header-row">
@@ -332,7 +316,20 @@
         </div>
       </div>
 
-      <!-- ====== ABSENCE CARD ====== -->
+      <div class="card">
+        <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Calendar <span class="chevron collapsed" id="vacationChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
+            <button id="vacCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
+            <span id="vacCalLabel" class="week-label"></span>
+            <button id="vacCalNextBtn" class="btn btn-ghost" type="button">›</button>
+            <button id="vacCalTodayBtn" class="btn btn-ghost" type="button">This month</button>
+          </div>
+        </div>
+        <div id="vacationBody" class="collapsible-body hidden">
+          <div id="vacationCalendar"></div>
+        </div>
+      </div>
       <div class="card">
         <div class="card-header-row card-toggle" id="absenceCardToggle" role="button" tabindex="0" aria-expanded="false">
           <h2>Absence <span class="chevron collapsed" id="absenceCardChevron">▾</span></h2>
@@ -361,16 +358,15 @@
             <label>Year
               <select id="absCalYear" style="width:100px"></select>
             </label>
+            <button class="btn btn-ghost" id="absCalAddYear" title="Add next year">+ Year</button>
           </div>
           <div id="absCalContent" style="margin-top:12px"></div>
-          <div class="stacked-form" style="margin-top:16px;max-width:280px">
+          <div class="stacked-form" style="margin-top:16px;max-width:200px">
             <h4 style="margin:0 0 8px;font-size:0.82rem;font-weight:600">Add office closing day</h4>
-            <div class="field-row" style="gap:12px;flex-wrap:nowrap;align-items:flex-end">
-              <label style="flex:0 0 auto">Date
-                <input type="date" id="closingDayDate" style="width:150px" />
-              </label>
-              <button type="button" id="addClosingDayBtn" class="btn btn-primary" style="flex:0 0 auto">Add</button>
-            </div>
+            <label>Date
+              <input type="date" id="closingDayDate" style="width:100%;margin-bottom:8px" />
+            </label>
+            <button type="button" id="addClosingDayBtn" class="btn btn-primary" style="width:100%">Add</button>
             <p id="closingDayError" class="empty-state hidden" style="color:#c0392b;margin-top:4px"></p>
           </div>
         </div>
@@ -455,7 +451,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202608010536"></script>
-<script src="app.js?v=202608010536"></script>
+<script src="config.js?v=202608010551"></script>
+<script src="app.js?v=202608010551"></script>
 </body>
 </html>
