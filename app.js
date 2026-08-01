@@ -1542,6 +1542,19 @@ async function exportTotalsPdf() {
     btn.disabled = false; btn.textContent = 'Export PDF';
   }
 }
+$('totalsProjectSelect').addEventListener('change', () => {
+  $('totalsFrom').value = '';
+  $('totalsTo').value   = '';
+  projectTotalsShowSummary = true;
+  $('toggleTotalsSummary').textContent = 'Summary ✓';
+  projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
+  document.querySelectorAll('.totals-col-toggle').forEach(btn => {
+    const col = btn.dataset.col;
+    btn.textContent = col.charAt(0).toUpperCase() + col.slice(1) + ' ✓';
+    btn.classList.add('active');
+  });
+  renderProjectTotals();
+});
 $('totalsFrom').addEventListener('change', renderProjectTotals);
 $('totalsTo').addEventListener('change', renderProjectTotals);
 $('totalsThisYear').addEventListener('click', () => {
