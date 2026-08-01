@@ -2109,6 +2109,7 @@ function listenUserEntries() {
 
 function renderWeekGrid() {
   if (!currentUser || currentUser.role !== 'user') return;
+  try {
 
   $('hoursHeading').textContent = `Hours week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}`;
   $('weekLabel').textContent = weekRangeLabel(weekStart);
@@ -2390,6 +2391,9 @@ function renderWeekGrid() {
     `<td><span class="foot-num">${trimZeros(grandTotalYTD)}</span></td></tr>`;
 
   // Flex / Difference / Balance rows — permanent position employees only
+  } catch (err) {
+    console.error('[renderWeekGrid crash]', err);
+  }
 }
 
 $('weekGridBody').addEventListener('click', (e) => {
