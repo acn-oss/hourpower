@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
-<link rel="stylesheet" href="fonts.css?v=202608011928" />
-<link rel="stylesheet" href="styles.css?v=202608011928" />
+<link rel="stylesheet" href="fonts.css?v=202608011940" />
+<link rel="stylesheet" href="styles.css?v=202608011940" />
 </head>
 <body>
 
@@ -241,10 +241,24 @@
           <h2>Project totals <span class="chevron collapsed" id="projectTotalsChevron">▾</span></h2>
         </div>
         <div id="projectTotalsBody" class="collapsible-body hidden">
-          <div class="filters">
+          <div class="filters" style="gap:12px;flex-wrap:wrap;align-items:flex-end">
             <label>Project
               <select id="totalsProjectSelect"><option value="">Choose a project…</option></select>
             </label>
+            <label>From <input type="date" id="totalsFrom" /></label>
+            <label>To   <input type="date" id="totalsTo"   /></label>
+            <button class="btn btn-ghost" id="totalsThisYear">This year</button>
+            <button class="btn btn-ghost" id="totalsAllTime">All time</button>
+          </div>
+          <div class="filters" style="gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+            <span style="font-size:0.78rem;color:var(--ink-soft)">Show:</span>
+            <button class="btn btn-ghost btn-sm" id="toggleTotalsSummary">Summary ✓</button>
+            <button class="btn btn-ghost btn-sm totals-col-toggle active" data-col="hours">Hours ✓</button>
+            <button class="btn btn-ghost btn-sm totals-col-toggle active" data-col="sales">Sales ✓</button>
+            <button class="btn btn-ghost btn-sm totals-col-toggle active" data-col="cost">Cost ✓</button>
+            <button class="btn btn-ghost btn-sm totals-col-toggle active" data-col="margin">Margin ✓</button>
+            <button class="btn btn-ghost" id="exportTotalsCsvBtn" style="margin-left:auto">Export CSV</button>
+            <button class="btn btn-ghost" id="exportTotalsPdfBtn">Export PDF</button>
           </div>
           <p id="totalsHint" class="empty-state">Choose a project above to see cost and sales totals per employee.</p>
           <p id="totalsEmptyState" class="empty-state hidden">No hours logged to this project yet.</p>
@@ -440,7 +454,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202608011928"></script>
-<script src="app.js?v=202608011928"></script>
+<script src="config.js?v=202608011940"></script>
+<script src="app.js?v=202608011940"></script>
 </body>
 </html>

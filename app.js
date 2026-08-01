@@ -141,6 +141,8 @@ let editingProjectUsers = [];
 let projectSortKey = 'code';
 let projectSortDir = 'desc';
 let collapsedParents = new Set();
+let projectTotalsShowSummary = true;
+let projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
 let userExpandedParents = new Set(); // empty = all parents collapsed by default in user grid
 
 function getParentIds() {
@@ -1316,30 +1318,47 @@ function resolveProjectRate(project, dateStr, uid) {
 
 function renderProjectTotals() {
   const projectId = $('totalsProjectSelect').value;
+  const from = $('totalsFrom').value || null;
+  const to   = $('totalsTo').value   || null;
   const tbody = $('projectTotalsTable').querySelector('tbody');
   const tfoot = $('projectTotalsTable').querySelector('tfoot');
+  const thead = $('projectTotalsTable').querySelector('thead tr');
 
   if (!projectId) {
     $('totalsHint').classList.remove('hidden');
     $('totalsEmptyState').classList.add('hidden');
     $('projectTotalsTable').classList.add('hidden');
     $('projectSummary').classList.add('hidden');
-    tbody.innerHTML = '';
-    tfoot.innerHTML = '';
+    tbody.innerHTML = ''; tfoot.innerHTML = '';
     return;
   }
   $('totalsHint').classList.add('hidden');
 
   const project = projectById(projectId);
   const isParent = project && getParentIds().has(project.id);
-
-  // For parent projects, aggregate entries from all child projects
   const relevantIds = isParent
     ? projectsCache.filter(p => p.parentId === projectId).map(p => p.id)
     : [projectId];
 
+  const sh = projectTotalsShowCols.has;
+  const showHours  = projectTotalsShowCols.has('hours');
+  const showSales  = projectTotalsShowCols.has('sales');
+  const showCost   = projectTotalsShowCols.has('cost');
+  const showMargin = projectTotalsShowCols.has('margin');
+
+  // Update table header
+  thead.innerHTML = '<th>Employee</th>' +
+    (showHours  ? '<th class="num">Hours</th>'       : '') +
+    (showSales  ? '<th class="num">Sales price</th>' : '') +
+    (showCost   ? '<th class="num">Cost price</th>'  : '') +
+    (showMargin ? '<th class="num">Margin</th>'      : '');
+
   const byUser = {};
-  allEntriesCache.filter(en => relevantIds.includes(en.projectId)).forEach(en => {
+  allEntriesCache.filter(en =>
+    relevantIds.includes(en.projectId) &&
+    (!from || en.date >= from) &&
+    (!to   || en.date <= to)
+  ).forEach(en => {
     if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, hours: 0, cost: 0, sales: 0 };
     const entryProject = projectById(en.projectId);
     const { salesRate, costRate } = resolveProjectRate(entryProject, en.date, en.userId);
@@ -1356,45 +1375,115 @@ function renderProjectTotals() {
   tbody.innerHTML = userIds.map(uid => {
     const { userName, hours, cost, sales } = byUser[uid];
     totalHours += hours; totalCost += cost; totalSales += sales;
-    return `
-    <tr>
+    return `<tr>
       <td>${escapeHtml(userName)}</td>
-      <td class="num">${trimZeros(hours)}</td>
-      <td class="num">${formatDkk(sales)}</td>
-      <td class="num">${formatDkk(cost)}</td>
-      <td class="num">${formatDkk(sales - cost)}</td>
+      ${showHours  ? `<td class="num">${trimZeros(hours)}</td>` : ''}
+      ${showSales  ? `<td class="num">${formatDkk(sales)}</td>` : ''}
+      ${showCost   ? `<td class="num">${formatDkk(cost)}</td>`  : ''}
+      ${showMargin ? `<td class="num">${formatDkk(sales - cost)}</td>` : ''}
     </tr>`;
   }).join('');
 
-  tfoot.innerHTML = `
-    <tr class="totals-row">
-      <td>Total</td>
-      <td class="num">${trimZeros(totalHours)}</td>
-      <td class="num">${formatDkk(totalSales)}</td>
-      <td class="num">${formatDkk(totalCost)}</td>
-      <td class="num">${formatDkk(totalSales - totalCost)}</td>
-    </tr>`;
+  tfoot.innerHTML = `<tr class="totals-row">
+    <td>Total</td>
+    ${showHours  ? `<td class="num">${trimZeros(totalHours)}</td>` : ''}
+    ${showSales  ? `<td class="num">${formatDkk(totalSales)}</td>` : ''}
+    ${showCost   ? `<td class="num">${formatDkk(totalCost)}</td>`  : ''}
+    ${showMargin ? `<td class="num">${formatDkk(totalSales - totalCost)}</td>` : ''}
+  </tr>`;
 
-  // Project-level fee summary — use children's sum if this is a parent container
   const _fees = (project && getParentIds().has(project.id))
-    ? computeParentFees(project.id)
-    : project;
+    ? computeParentFees(project.id) : project;
   const expectedFee = (_fees && _fees.expectedFee) || 0;
   const subadvisors  = (_fees && _fees.subadvisors)  || 0;
   const netFee = expectedFee - subadvisors;
   const margin = netFee - totalCost;
   const factor = totalCost > 0 ? (netFee / totalCost) : null;
 
-  $('projectSummary').classList.remove('hidden');
-  $('sumExpectedFee').textContent = formatDkk(expectedFee);
-  $('sumSubadvisors').textContent = formatDkk(subadvisors);
-  $('sumNetFee').textContent = formatDkk(netFee);
-  $('sumCostPrice').textContent = formatDkk(totalCost);
-  $('sumMargin').textContent = formatDkk(margin);
-  $('sumFactor').textContent = factor === null ? '—' : `${factor.toFixed(1)}x`;
+  $('projectSummary').classList.toggle('hidden', !projectTotalsShowSummary);
+  if (projectTotalsShowSummary) {
+    $('sumExpectedFee').textContent = formatDkk(expectedFee);
+    $('sumSubadvisors').textContent = formatDkk(subadvisors);
+    $('sumNetFee').textContent      = formatDkk(netFee);
+    $('sumCostPrice').textContent   = formatDkk(totalCost);
+    $('sumMargin').textContent      = formatDkk(margin);
+    $('sumFactor').textContent      = factor === null ? '—' : `${factor.toFixed(1)}x`;
+  }
 }
 
-$('totalsProjectSelect').addEventListener('change', renderProjectTotals);
+function exportTotalsCsv() {
+  const projectId = $('totalsProjectSelect').value;
+  if (!projectId) return;
+  const project = projectById(projectId);
+  const from = $('totalsFrom').value || null;
+  const to   = $('totalsTo').value   || null;
+  const rows = $('projectTotalsTable').querySelectorAll('tbody tr');
+  const headers = [...$('projectTotalsTable').querySelectorAll('thead th')].map(th => th.textContent);
+  const csv = [
+    headers.join(','),
+    ...[...rows].map(tr => [...tr.querySelectorAll('td')].map(td => `"${td.textContent.replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `project-totals-${(project?.code || projectId)}${from ? `-${from}` : ''}${to ? `-${to}` : ''}.csv`;
+  a.click();
+}
+
+function exportTotalsPdf() {
+  const projectId = $('totalsProjectSelect').value;
+  if (!projectId) return;
+  const project = projectById(projectId);
+  const from = $('totalsFrom').value || null;
+  const to   = $('totalsTo').value   || null;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+  const headers = [...$('projectTotalsTable').querySelectorAll('thead th')].map(th => th.textContent);
+  const rows = [...$('projectTotalsTable').querySelectorAll('tbody tr, tfoot tr')].map(tr =>
+    [...tr.querySelectorAll('td')].map(td => td.textContent)
+  );
+  const title = `Project Totals: ${project?.name || projectId}`;
+  const subtitle = from || to ? `Period: ${from || '—'} → ${to || '—'}` : 'All time';
+  doc.setFontSize(14); doc.text(title, 14, 18);
+  doc.setFontSize(9); doc.setTextColor(100); doc.text(subtitle, 14, 25);
+  doc.autoTable({ head: [headers], body: rows, startY: 30, styles: { fontSize: 9 } });
+  doc.save(`project-totals-${project?.code || projectId}.pdf`);
+}
+$('totalsFrom').addEventListener('change', renderProjectTotals);
+$('totalsTo').addEventListener('change', renderProjectTotals);
+$('totalsThisYear').addEventListener('click', () => {
+  const y = new Date().getFullYear();
+  $('totalsFrom').value = `${y}-01-01`;
+  $('totalsTo').value   = `${y}-12-31`;
+  renderProjectTotals();
+});
+$('totalsAllTime').addEventListener('click', () => {
+  $('totalsFrom').value = '';
+  $('totalsTo').value   = '';
+  renderProjectTotals();
+});
+$('toggleTotalsSummary').addEventListener('click', () => {
+  projectTotalsShowSummary = !projectTotalsShowSummary;
+  $('toggleTotalsSummary').textContent = `Summary ${projectTotalsShowSummary ? '✓' : '✗'}`;
+  renderProjectTotals();
+});
+document.querySelectorAll('.totals-col-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const col = btn.dataset.col;
+    if (projectTotalsShowCols.has(col)) {
+      projectTotalsShowCols.delete(col);
+      btn.textContent = `${col.charAt(0).toUpperCase() + col.slice(1)} ✗`;
+      btn.classList.remove('active');
+    } else {
+      projectTotalsShowCols.add(col);
+      btn.textContent = `${col.charAt(0).toUpperCase() + col.slice(1)} ✓`;
+      btn.classList.add('active');
+    }
+    renderProjectTotals();
+  });
+});
+$('exportTotalsCsvBtn').addEventListener('click', exportTotalsCsv);
+$('exportTotalsPdfBtn').addEventListener('click', exportTotalsPdf);
 
 function renderFilterProjectSelect() {
   // Sort projects by code descending (highest first) for the dropdowns
