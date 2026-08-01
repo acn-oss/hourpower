@@ -49,14 +49,67 @@ let officeCalendarCache = {}; // year string -> { closingDays:[{date,name}], del
 
 // ---- Office calendar helpers ----
 function getYearCalendar(year) {
-  return officeCalendarCache[String(year)] || { closingDays: [], deletedHolidays: [] };
+  const data = officeCalendarCache[String(year)] || {};
+  return {
+    closingDays:      data.closingDays      || [],
+    deletedHolidays:  data.deletedHolidays  || [],
+    holidayOverrides: data.holidayOverrides  || {}
+  };
+}
+
+const DANISH_HOLIDAY_NAMES = {
+  'Ea. Thu':   'Skærtorsdag',
+  'Ea. Fri':   'Langfredag',
+  'Ea. Sun':   'Påskedag',
+  'Ea. Mon':   'Anden påskedag',
+  'Ascension': 'Kristi himmelfartsdag',
+  'Whit Sun':  'Pinsedag',
+  'Whit Mon':  'Anden pinsedag',
+  'Xmas Eve':  'Juleaften',
+  'Xmas Day':  'Juledag',
+  '2nd Xmas':  'Anden juledag',
+  'NYE':       'Nytårsaften',
+  'NYD':       'Nytårsdag',
+};
+
+function getSuggestedClosingDays(year) {
+  const suggestions = [];
+  const allHolidays = getDanishHolidays(year);
+  const { closingDays } = getYearCalendar(year);
+  const existingDates = new Set([...Object.keys(allHolidays), ...closingDays.map(c => c.date)]);
+
+  const add = (date, reason) => {
+    const dow = new Date(date + 'T00:00:00').getDay();
+    if (dow === 0 || dow === 6) return; // skip weekends
+    if (existingDates.has(date)) return; // skip existing
+    suggestions.push({ date, reason });
+  };
+
+  // Mon-Wed of Holy Week (Easter - 6, -5, -4)
+  const easter = getEasterSunday(year);
+  [-6, -5, -4].forEach(offset => {
+    const d = new Date(easter);
+    d.setDate(d.getDate() + offset);
+    add(toISODate(d), 'Holy Week');
+  });
+
+  // Weekdays between 2nd Xmas (26 Dec) and NYE (31 Dec)
+  for (let day = 27; day <= 30; day++) {
+    add(`${year}-12-${String(day).padStart(2, '0')}`, 'Between Xmas & NYE');
+  }
+
+  return suggestions;
 }
 function getActiveHolidays(year) {
   const sys = getDanishHolidays(year);
-  const { deletedHolidays } = getYearCalendar(year);
+  const { deletedHolidays, holidayOverrides } = getYearCalendar(year);
   const result = {};
   Object.entries(sys).forEach(([date, name]) => {
-    if (!deletedHolidays.includes(date)) result[date] = name;
+    if (deletedHolidays.includes(date)) return;
+    const ov = holidayOverrides[date];
+    const finalDate = (ov && ov.date) ? ov.date : date;
+    const finalName = (ov && ov.name) ? ov.name : name;
+    result[finalDate] = finalName;
   });
   return result;
 }
@@ -2438,7 +2491,7 @@ absSetThisYear();
 (function() {
   const sel = $('absCalYear');
   const cur = new Date().getFullYear();
-  for (let y = cur - 1; y <= cur + 3; y++) {
+  for (let y = cur - 1; y <= cur + 15; y++) {
     const o = document.createElement('option');
     o.value = y; o.textContent = y;
     if (y === cur) o.selected = true;
@@ -2449,7 +2502,6 @@ absSetThisYear();
 
 $('addClosingDayBtn').addEventListener('click', async () => {
   const date = $('closingDayDate').value;
-  const name = $('closingDayName').value.trim() || 'Office Closed';
   const errEl = $('closingDayError');
   errEl.classList.add('hidden');
 
@@ -2464,19 +2516,22 @@ $('addClosingDayBtn').addEventListener('click', async () => {
   if (getActiveHolidays(yr)[date]) {
     errEl.textContent = 'That date is already a public holiday.'; errEl.classList.remove('hidden'); return;
   }
-
   const yearData = getYearCalendar(yr);
   if (yearData.closingDays.some(c => c.date === date)) {
     errEl.textContent = 'That date is already an office closing day.'; errEl.classList.remove('hidden'); return;
   }
 
-  const newClosing = [...yearData.closingDays, { date, name }];
-  await db.collection('officeCalendar').doc(String(yr)).set(
-    { closingDays: newClosing }, { merge: true }
-  );
-  $('closingDayDate').value = '';
-  $('closingDayName').value = '';
-  showStamp('Saved');
+  const newClosing = [...yearData.closingDays, { date, name: 'Office Closed' }];
+  try {
+    await db.collection('officeCalendar').doc(String(yr)).set(
+      { closingDays: newClosing }, { merge: true }
+    );
+    $('closingDayDate').value = '';
+    showStamp('Saved');
+  } catch (err) {
+    errEl.textContent = 'Could not save: ' + err.message;
+    errEl.classList.remove('hidden');
+  }
 });
 
 function renderAbsenceCard() {
@@ -2490,63 +2545,146 @@ function renderAbsenceCalSection() {
   if (!container) return;
 
   const sysHolidays = getDanishHolidays(year);
-  const { deletedHolidays, closingDays } = getYearCalendar(year);
+  const { deletedHolidays, closingDays, holidayOverrides } = getYearCalendar(year);
 
-  // Holidays table
-  const holidayRows = Object.entries(sysHolidays).map(([date, name]) => {
-    const deleted = deletedHolidays.includes(date);
-    return `<tr class="${deleted ? 'proj-paused' : ''}">
-      <td>${formatDate(date)}</td>
-      <td>${name}${deleted ? ' <span class="paused-badge">Removed</span>' : ''}</td>
+  // Holidays table with Danish name, Edit, Delete with confirm
+  const holidayRows = Object.entries(sysHolidays).map(([origDate, origName]) => {
+    const ov = holidayOverrides[origDate] || {};
+    const dispDate = ov.date || origDate;
+    const dispName = ov.name || origName;
+    const danishName = DANISH_HOLIDAY_NAMES[origName] || '';
+    const deleted = deletedHolidays.includes(origDate);
+    if (deleted) {
+      return `<tr class="proj-paused">
+        <td>${formatDate(origDate)}</td>
+        <td>${origName} <span class="paused-badge">Deleted</span></td>
+        <td>${danishName}</td>
+        <td class="row-actions">
+          <button class="link-btn" data-restore-holiday="${origDate}" data-holiday-year="${year}">Restore</button>
+        </td>
+      </tr>`;
+    }
+    return `<tr>
+      <td>${formatDate(dispDate)}</td>
+      <td>${escapeHtml(dispName)}</td>
+      <td style="color:var(--ink-soft)">${danishName}</td>
       <td class="row-actions">
-        ${deleted
-          ? `<button class="link-btn" data-restore-holiday="${date}" data-holiday-year="${year}">Restore</button>`
-          : `<button class="link-btn link-danger" data-delete-holiday="${date}" data-holiday-year="${year}">Remove</button>`}
+        <button class="link-btn" data-edit-holiday="${origDate}" data-holiday-year="${year}">Edit</button>
+        <button class="link-btn link-danger" data-delete-holiday="${origDate}" data-holiday-year="${year}">Delete</button>
       </td>
     </tr>`;
   }).join('');
 
   // Closing days table
-  const closingRows = (closingDays || []).sort((a, b) => a.date.localeCompare(b.date)).map(cd => `
+  const closingRows = closingDays.sort((a, b) => a.date.localeCompare(b.date)).map(cd => `
     <tr>
       <td>${formatDate(cd.date)}</td>
-      <td>${escapeHtml(cd.name || 'Office Closed')}</td>
+      <td>Office Closed</td>
       <td class="row-actions">
         <button class="link-btn link-danger" data-delete-closing="${cd.date}" data-closing-year="${year}">Delete</button>
       </td>
     </tr>`).join('');
 
+  // Suggested closing days
+  const suggestions = getSuggestedClosingDays(year);
+  const suggestSection = suggestions.length ? `
+    <div style="margin-top:20px">
+      <h4 style="font-size:0.82rem;font-weight:600;margin:0 0 8px">Suggested closing days ${year}</h4>
+      <p style="font-size:0.78rem;color:var(--ink-soft);margin:0 0 8px">Check the ones you want to approve:</p>
+      <div id="suggestionsList">
+        ${suggestions.map(s => `
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;margin-bottom:4px">
+            <input type="checkbox" class="sugg-check" value="${s.date}" />
+            ${formatDate(s.date)}
+            <span style="color:var(--ink-soft);font-size:0.75rem">(${s.reason})</span>
+          </label>`).join('')}
+      </div>
+      <button class="btn btn-primary" style="margin-top:10px" id="approveSuggestionsBtn" data-sugg-year="${year}">
+        Add approved suggestions
+      </button>
+    </div>` : '';
+
   container.innerHTML = `
     <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
-      <div style="flex:1;min-width:280px">
+      <div style="flex:1;min-width:300px">
         <h4 style="font-size:0.82rem;font-weight:600;margin:0 0 8px">Public holidays ${year}</h4>
         <table class="ledger-table">
-          <thead><tr><th>Date</th><th>Name</th><th></th></tr></thead>
+          <thead><tr><th>Date</th><th>English</th><th>Danish</th><th></th></tr></thead>
           <tbody>${holidayRows}</tbody>
         </table>
       </div>
-      <div style="flex:1;min-width:280px">
+      <div style="flex:1;min-width:240px">
         <h4 style="font-size:0.82rem;font-weight:600;margin:0 0 8px">Office closing days ${year}</h4>
-        ${closingDays && closingDays.length
+        ${closingDays.length
           ? `<table class="ledger-table">
               <thead><tr><th>Date</th><th>Name</th><th></th></tr></thead>
               <tbody>${closingRows}</tbody>
             </table>`
-          : `<p class="empty-state">No office closing days added yet.</p>`}
+          : `<p class="empty-state" style="margin:0">None added yet.</p>`}
+        ${suggestSection}
       </div>
     </div>`;
 }
 
 // Delegate holiday/closing day actions
+// Delegate holiday/closing day actions
 document.addEventListener('click', async (e) => {
+
+  // Edit holiday — show inline form
+  if (e.target.dataset.editHoliday) {
+    const origDate = e.target.dataset.editHoliday;
+    const year = e.target.dataset.holidayYear;
+    const { holidayOverrides } = getYearCalendar(year);
+    const sysHolidays = getDanishHolidays(parseInt(year));
+    const ov = holidayOverrides[origDate] || {};
+    const curDate = ov.date || origDate;
+    const curName = ov.name || sysHolidays[origDate] || '';
+    const row = e.target.closest('tr');
+    if (!row) return;
+    row.innerHTML = `
+      <td><input type="date" value="${curDate}" id="editHolDate" style="width:130px" /></td>
+      <td><input type="text" value="${escapeHtml(curName)}" id="editHolName" style="width:130px" /></td>
+      <td></td>
+      <td class="row-actions">
+        <button class="link-btn" id="saveHolEdit" data-orig-date="${origDate}" data-year="${year}">Save</button>
+        <button class="link-btn" id="cancelHolEdit">Cancel</button>
+      </td>`;
+    return;
+  }
+
+  // Save holiday edit
+  if (e.target.id === 'saveHolEdit') {
+    const origDate = e.target.dataset.origDate;
+    const year = e.target.dataset.year;
+    const newDate = document.getElementById('editHolDate').value;
+    const newName = document.getElementById('editHolName').value.trim();
+    const { holidayOverrides } = getYearCalendar(year);
+    const overrides = { ...holidayOverrides, [origDate]: { date: newDate || origDate, name: newName } };
+    await db.collection('officeCalendar').doc(String(year)).set({ holidayOverrides: overrides }, { merge: true });
+    showStamp('Saved');
+    return;
+  }
+
+  // Cancel holiday edit
+  if (e.target.id === 'cancelHolEdit') {
+    renderAbsenceCalSection();
+    return;
+  }
+
+  // Delete holiday with confirm
   if (e.target.dataset.deleteHoliday) {
     const date = e.target.dataset.deleteHoliday;
     const year = e.target.dataset.holidayYear;
+    const name = getDanishHolidays(parseInt(year))[date] || date;
+    if (!confirm(`Delete holiday "${name}" on ${formatDate(date)}?\n\nThis removes it from the calendar and from balance calculations. You can restore it later.`)) return;
     const yearData = getYearCalendar(year);
     await db.collection('officeCalendar').doc(String(year)).set(
       { deletedHolidays: [...new Set([...yearData.deletedHolidays, date])] }, { merge: true }
     );
+    return;
   }
+
+  // Restore deleted holiday
   if (e.target.dataset.restoreHoliday) {
     const date = e.target.dataset.restoreHoliday;
     const year = e.target.dataset.holidayYear;
@@ -2554,15 +2692,35 @@ document.addEventListener('click', async (e) => {
     await db.collection('officeCalendar').doc(String(year)).set(
       { deletedHolidays: yearData.deletedHolidays.filter(d => d !== date) }, { merge: true }
     );
+    return;
   }
+
+  // Delete closing day with confirm
   if (e.target.dataset.deleteClosing) {
     const date = e.target.dataset.deleteClosing;
     const year = e.target.dataset.closingYear;
-    if (!confirm(`Delete closing day on ${formatDate(date)}?`)) return;
+    if (!confirm(`Delete office closing day on ${formatDate(date)}?`)) return;
     const yearData = getYearCalendar(year);
     await db.collection('officeCalendar').doc(String(year)).set(
-      { closingDays: (yearData.closingDays || []).filter(c => c.date !== date) }, { merge: true }
+      { closingDays: yearData.closingDays.filter(c => c.date !== date) }, { merge: true }
     );
+    return;
+  }
+
+  // Approve suggestions
+  if (e.target.id === 'approveSuggestionsBtn') {
+    const year = parseInt(e.target.dataset.suggYear);
+    const checked = [...document.querySelectorAll('.sugg-check:checked')].map(cb => cb.value);
+    if (!checked.length) return;
+    const yearData = getYearCalendar(year);
+    const newClosing = [...yearData.closingDays, ...checked.map(date => ({ date, name: 'Office Closed' }))];
+    try {
+      await db.collection('officeCalendar').doc(String(year)).set(
+        { closingDays: newClosing }, { merge: true }
+      );
+      showStamp('Saved');
+    } catch (err) { alert('Could not save: ' + err.message); }
+    return;
   }
 });
 
