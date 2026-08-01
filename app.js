@@ -822,7 +822,6 @@ $('vacCalPrevBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCa
 $('vacCalNextBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCalendarDate = new Date(vacCalendarDate.getFullYear(), vacCalendarDate.getMonth() + 1, 1); renderVacationCalendar(); });
 $('vacCalTodayBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderVacationCalendar(); });
 
-makeToggle('vacationToggle', 'vacationBody', 'vacationChevron');
 // Re-render calendar whenever the card is expanded
 $('vacationToggle').addEventListener('click', () => {
   if ($('vacationToggle').getAttribute('aria-expanded') === 'true') renderVacationCalendar();
@@ -1816,7 +1815,6 @@ $('archivedTable').addEventListener('click', async (e) => {
   }
 });
 
-makeToggle('archivedToggle', 'archivedBody', 'archivedChevron');
 
 function openAccessPanel(projectId) {
   const p = projectsCache.find(x => x.id === projectId);
@@ -1999,7 +1997,7 @@ function initExtraTypeCards() {
     }
   });
 
-  // Re-attach all static editor card toggles when editor logs in
+  // Register all static editor card toggles once here
   [
     ['archivedToggle',      'archivedBody',      'archivedChevron'],
     ['projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron'],
@@ -2492,7 +2490,6 @@ function makeToggle(toggleId, bodyId, chevronId) {
   });
 }
 
-makeToggle('absenceCardToggle', 'absenceCardBody', 'absenceCardChevron');
 $('absenceCardToggle').addEventListener('click', () => {
   if ($('absenceCardToggle').getAttribute('aria-expanded') === 'true') renderAbsenceCard();
 });
@@ -2812,14 +2809,10 @@ function renderAbsenceSummary() {
       <td class="num">${r.total ? `<strong>${r.total} d</strong>` : '—'}</td>
     </tr>`).join('');
 }
-makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
-makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
 makeToggle('rateLineToggle', 'rateLinesSections', 'rateLineChevron');
 makeToggle('hoursCardToggle', 'hoursCardBody', 'hoursCardChevron');
 makeToggle('flexToggle', 'flexBody', 'flexChevron');
 makeToggle('vacSummaryToggle', 'vacSummaryBody', 'vacSummaryChevron');
-makeToggle('archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron');
-makeToggle('allEntriesToggle', 'allEntriesBody', 'allEntriesChevron');
 
 $('archivedUsersTable').addEventListener('click', async (e) => {
   const unarchiveUid = e.target.dataset.unarchiveUser;
