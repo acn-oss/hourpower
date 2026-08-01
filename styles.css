@@ -977,10 +977,10 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   white-space: nowrap;
   font-weight: 500;
 }
-.vac-chip.ferielov      { background: #FFF9C4; color: #5D4037; }
-.vac-chip.feriefridag   { background: #FFF176; color: #4E342E; }
-.vac-chip.afspad        { background: #FFFDE7; color: #6D4C41; }
-.vac-chip.sick          { background: #FFE082; color: #3E2723; }
+.vac-chip.ferielov      { background: #B0BEC5; color: #1C313A; }
+.vac-chip.feriefridag   { background: #D7CCC8; color: #3E2723; }
+.vac-chip.afspad        { background: #CFD8DC; color: #263238; }
+.vac-chip.sick          { background: #BDBDBD; color: #212121; }
 
 /* ==========================================================
    Vacation grid — employees × days
@@ -1104,12 +1104,12 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 
 /* build 202507292305 */
 
-/* Absence dropdown colours by type — yellow tones */
+/* Absence dropdown colours by type — grey tones */
 .absence-select { transition: background 0.15s, color 0.15s; }
-.absence-select[data-type="afspad"]       { background: #FFFDE7; color: #6D4C41; border-color: #FFE082; }
-.absence-select[data-type="ferielov"]     { background: #FFF9C4; color: #5D4037; border-color: #FFD54F; }
-.absence-select[data-type="feriefridag"]  { background: #FFF176; color: #4E342E; border-color: #FFCA28; }
-.absence-select[data-type="sick"]         { background: #FFE082; color: #3E2723; border-color: #FFB300; }
+.absence-select[data-type="afspad"]       { background: #CFD8DC; color: #263238; border-color: #90A4AE; }
+.absence-select[data-type="ferielov"]     { background: #B0BEC5; color: #1C313A; border-color: #78909C; }
+.absence-select[data-type="feriefridag"]  { background: #D7CCC8; color: #3E2723; border-color: #A1887F; }
+.absence-select[data-type="sick"]         { background: #BDBDBD; color: #212121; border-color: #9E9E9E; }
 
 /* Public holiday cells */
 .holiday-cell { background: #EDEEE9 !important; } /* slightly brighter than weekend #E5E7DF */
@@ -1135,7 +1135,7 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   line-height: 1.2;
   padding: 2px 1px;
 }
-.absence-select[data-type="day_off"] { background: #FFF9C4; color: #5D4037; border-color: #FFD54F; }
+.absence-select[data-type="day_off"]      { background: #E0E0E0; color: #424242; border-color: #BDBDBD; }
 
 .section-sub-heading {
   font-size: 0.82rem;
@@ -1147,3 +1147,9 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   padding-bottom: 6px;
   border-bottom: 1px solid var(--line-soft);
 }
+
+/* Project Totals table alignment */
+#projectTotalsTable td:first-child,
+#projectTotalsTable th:first-child { text-align: left; }
+#projectTotalsTable td:not(:first-child),
+#projectTotalsTable th:not(:first-child) { text-align: right; }
