@@ -1446,7 +1446,7 @@ function renderFilterProjectSelect() {
     filterSel.innerHTML += `<optgroup label="Projects">${projectOptions(sortedProjects)}</optgroup>`;
   }
   EXTRA_TYPES.forEach(({ type, label }) => {
-    if (extraCache[type].length) {
+    if ((extraCache[type] || []).length) {
       filterSel.innerHTML += `<optgroup label="${label}">${projectOptions(extraCache[type])}</optgroup>`;
     }
   });
@@ -1982,7 +1982,7 @@ function initExtraTypeCards() {
       const accessId = e.target.dataset.extraAccess;
 
       if (editId) {
-        const p = extraCache[type].find(x => x.id === editId);
+        const p = ( extraCache[type] || [] ).find(x => x.id === editId);
         currentExtraEdit = { type, id: editId };
         document.getElementById(`formId-${type}`).value = editId;
         document.getElementById(`formName-${type}`).value = p.name;
@@ -1992,11 +1992,11 @@ function initExtraTypeCards() {
         document.getElementById(`form-${type}`).classList.remove('hidden');
       }
       if (toggleId) {
-        const p = extraCache[type].find(x => x.id === toggleId);
+        const p = ( extraCache[type] || [] ).find(x => x.id === toggleId);
         await db.collection('projects').doc(toggleId).update({ active: p.active === false ? true : false });
       }
       if (accessId) {
-        const p = extraCache[type].find(x => x.id === accessId);
+        const p = ( extraCache[type] || [] ).find(x => x.id === accessId);
         currentExtraAccess = { type, id: accessId };
         document.getElementById(`accessName-${type}`).textContent = p.name;
         const assigned = new Set(p.assignedUserIds || []);
