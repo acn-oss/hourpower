@@ -669,11 +669,16 @@ auth.onAuthStateChanged(async (user) => {
     listenUserRates();
     listenUserAbsences();
   } else {
-    initExtraTypeCards();
-    listenAllEntriesForEditor();
-    listenAllUsers();
-    listenRates();
-    listenAllAbsences();
+    try {
+      initExtraTypeCards();
+      listenAllEntriesForEditor();
+      listenAllUsers();
+      listenRates();
+      listenAllAbsences();
+    } catch (err) {
+      console.error('[Editor init error]', err);
+      alert('Editor init error: ' + err.message + '\n\nCheck the browser console for details.');
+    }
   }
 });
 
@@ -1813,7 +1818,14 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectForm').classList.remove('hidden');
   }
   if (toggleId) {
-    await db.collection('projects').doc(toggleId).update({ active: false, archivedAt: toISODate(new Date()) });
+    const p = projectsCache.find(x => x.id === toggleId);
+    const name = p ? p.name : 'this project';
+    if (!confirm(`Archive "${name}"?\n\nIt will no longer appear in the app but logged hours are kept. You can unarchive it later.`)) return;
+    try {
+      await db.collection('projects').doc(toggleId).update({ active: false, archivedAt: toISODate(new Date()) });
+    } catch (err) {
+      alert('Could not archive project: ' + err.message);
+    }
   }
   if (accessId) {
     openAccessPanel(accessId);
