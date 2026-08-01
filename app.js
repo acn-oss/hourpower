@@ -827,7 +827,11 @@ $('vacationToggle').addEventListener('click', () => {
   if ($('vacationToggle').getAttribute('aria-expanded') === 'true') renderVacationCalendar();
 });
 
-const EXTRA_TYPE_COLORS = { adm: '#607D8B', aq: '#546E7A', int: '#78909C' };
+const EXTRA_TYPE_COLORS = {
+  adm: { bg: '#E8D5B0', text: '#5D4037' },  // bright sand / beige
+  aq:  { bg: '#FFD740', text: '#5D4037' },  // bright yellow
+  int: { bg: '#6D4C41', text: '#fff'    }   // dark brownish
+};
 
 function findProjectAnywhere(id) {
   const p = projectsCache.find(x => x.id === id);
@@ -942,9 +946,12 @@ function renderVacationCalendar() {
     const topId = Object.entries(dayEntries).sort((a, b) => b[1] - a[1])[0][0];
     const proj = findProjectAnywhere(topId);
     if (!proj) return null;
-    if (proj._extraType) return { color: EXTRA_TYPE_COLORS[proj._extraType], name: proj.name || proj._extraType.toUpperCase() };
+    if (proj._extraType) {
+      const c = EXTRA_TYPE_COLORS[proj._extraType] || { bg: '#B0BEC5', text: '#263238' };
+      return { color: c.bg, textColor: c.text, name: proj.name || proj._extraType.toUpperCase() };
+    }
     const color = getProjectBadgeColor(proj);
-    return color ? { color, name: proj.name } : null;
+    return color ? { color, textColor: '#fff', name: proj.name } : null;
   };
 
   const bodyRows = employees.map(u => {
@@ -956,7 +963,7 @@ function renderVacationCalendar() {
       const work    = !type && !holiday && !d.isWE ? getWorkColor(u.uid, d.ds) : null;
       const isGrey  = d.isWE || !!holiday;
       const bg      = s ? s.bg : work ? work.color : isGrey ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
-      const clr     = s ? s.color : work ? '#fff' : '';
+      const clr     = s ? s.color : work ? (work.textColor || '#fff') : '';
       const style   = bg ? `background:${bg};${clr ? `color:${clr}` : ''}` : '';
       const label   = s ? s.label : (holiday ? `<span class="holiday-name-cell" style="font-size:0.6rem">${holiday}</span>` : '');
       const title   = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : (holiday || (work ? work.name : ''));
