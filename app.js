@@ -1430,24 +1430,117 @@ function exportTotalsCsv() {
   a.click();
 }
 
-function exportTotalsPdf() {
+async function exportTotalsPdf() {
   const projectId = $('totalsProjectSelect').value;
   if (!projectId) return;
   const project = projectById(projectId);
   const from = $('totalsFrom').value || null;
   const to   = $('totalsTo').value   || null;
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape' });
-  const headers = [...$('projectTotalsTable').querySelectorAll('thead th')].map(th => th.textContent);
-  const rows = [...$('projectTotalsTable').querySelectorAll('tbody tr, tfoot tr')].map(tr =>
-    [...tr.querySelectorAll('td')].map(td => td.textContent)
-  );
-  const title = `Project Totals: ${project?.name || projectId}`;
-  const subtitle = from || to ? `Period: ${from || '—'} → ${to || '—'}` : 'All time';
-  doc.setFontSize(14); doc.text(title, 14, 18);
-  doc.setFontSize(9); doc.setTextColor(100); doc.text(subtitle, 14, 25);
-  doc.autoTable({ head: [headers], body: rows, startY: 30, styles: { fontSize: 9 } });
-  doc.save(`project-totals-${project?.code || projectId}.pdf`);
+  const btn = $('exportTotalsPdfBtn');
+  btn.disabled = true; btn.textContent = 'Generating…';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const M = 14;
+    const INK  = [28, 42, 46];
+    const WHITE = [255, 255, 255];
+    const TEAL  = [47, 93, 90];
+    const SOFT  = [220, 230, 224];
+    const ALT   = [242, 245, 240];
+
+    // Header bar
+    const HEADER_H = 24;
+    doc.setFillColor(...INK);
+    doc.rect(0, 0, W, HEADER_H, 'F');
+
+    const logoData = await loadLogoBase64();
+    if (logoData) doc.addImage(logoData, 'PNG', M, 3, 18, 18);
+
+    const titleX = M + (logoData ? 22 : 0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...WHITE);
+    doc.text('Hour Power — Project Totals Report', titleX, 12);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 200, 196);
+    doc.text('Urban Power Architecture + Urbanism', titleX, 19);
+
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(7.5);
+    doc.text(`Generated: ${new Date().toLocaleDateString('da-DK')}`, W - M, 12, { align: 'right' });
+
+    // Subtitle
+    const projLabel = project ? `${project.code ? project.code + '  ' : ''}${project.name}` : projectId;
+    const period = from || to ? `${from ? formatDate(from) : '—'} → ${to ? formatDate(to) : '—'}` : 'All time';
+    doc.setTextColor(...INK);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.text(`${projLabel}  ·  ${period}`, M, HEADER_H + 8);
+
+    // Summary bar (if visible)
+    let startY = HEADER_H + 13;
+    if (projectTotalsShowSummary) {
+      const summaryItems = [
+        ['Expected fee', $('sumExpectedFee').textContent],
+        ['Subadvisors',  $('sumSubadvisors').textContent],
+        ['Net fee',      $('sumNetFee').textContent],
+        ['Cost price',   $('sumCostPrice').textContent],
+        ['Margin',       $('sumMargin').textContent],
+        ['Factor',       $('sumFactor').textContent],
+      ];
+      doc.setFillColor(...SOFT);
+      doc.rect(M, startY, W - 2 * M, 14, 'F');
+      const colW = (W - 2 * M) / summaryItems.length;
+      summaryItems.forEach(([label, value], i) => {
+        const x = M + i * colW + 4;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(90, 110, 108);
+        doc.text(label.toUpperCase(), x, startY + 4.5);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...INK);
+        doc.text(value, x, startY + 11);
+      });
+      startY += 18;
+    }
+
+    // Build table columns based on visibility
+    const colHeaders = ['Employee'];
+    if (projectTotalsShowCols.has('hours'))  colHeaders.push('Hours');
+    if (projectTotalsShowCols.has('sales'))  colHeaders.push('Sales price');
+    if (projectTotalsShowCols.has('cost'))   colHeaders.push('Cost price');
+    if (projectTotalsShowCols.has('margin')) colHeaders.push('Margin');
+
+    const tableRows = [...$('projectTotalsTable').querySelectorAll('tbody tr')].map(tr =>
+      [...tr.querySelectorAll('td')].map(td => td.textContent)
+    );
+    const footRow = [...($('projectTotalsTable').querySelectorAll('tfoot td'))].map(td => td.textContent);
+
+    doc.autoTable({
+      startY,
+      margin: { left: M, right: M },
+      head: [colHeaders],
+      body: tableRows,
+      foot: footRow.length ? [footRow] : [],
+      headStyles: { fillColor: INK, textColor: WHITE, fontSize: 7.5, fontStyle: 'bold', cellPadding: 3 },
+      footStyles: { fillColor: SOFT, textColor: INK, fontSize: 7.5, fontStyle: 'bold', cellPadding: 3 },
+      bodyStyles: { fontSize: 7.5, textColor: INK, cellPadding: 2.5 },
+      alternateRowStyles: { fillColor: ALT },
+      columnStyles: { 0: { cellWidth: 50 } },
+      didDrawPage: ({ pageNumber }) => {
+        const total = doc.internal.getNumberOfPages();
+        doc.setFontSize(6.5); doc.setTextColor(160, 160, 160); doc.setFont('helvetica', 'normal');
+        doc.text('Urban Power Architecture + Urbanism', M, H - 5);
+        doc.text(`Page ${pageNumber} of ${total}`, W - M, H - 5, { align: 'right' });
+      }
+    });
+
+    doc.save(`project-totals-${project?.code || projectId}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Export PDF';
+  }
 }
 $('totalsFrom').addEventListener('change', renderProjectTotals);
 $('totalsTo').addEventListener('change', renderProjectTotals);
