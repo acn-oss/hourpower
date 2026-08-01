@@ -194,12 +194,14 @@ const PROJECT_CATEGORY_LABELS = {
   other:         'Other'
 };
 
-function getProjectBadgeColor(project) {
+function getProjectBadgeColor(project, _visited = new Set()) {
   if (!project.code) return null;
+  if (_visited.has(project.id)) return null; // break circular reference
+  _visited.add(project.id);
   // Children inherit their parent's colour
   if (project.parentId) {
     const parent = projectsCache.find(p => p.id === project.parentId);
-    if (parent) return getProjectBadgeColor(parent);
+    if (parent) return getProjectBadgeColor(parent, _visited);
   }
   const cat = project.category || 'other';
   const palette = PROJECT_PALETTES[cat] || PROJECT_PALETTES.other;
