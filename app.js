@@ -759,7 +759,6 @@ function listenAllUsers() {
     EXTRA_TYPES.forEach(({ type }) => renderExtraTable(type));
     renderRatesTable();
     renderArchivedUsersTable();
-    renderWeekOverview();
     renderVacationCalendar();
   });
 }
@@ -851,6 +850,18 @@ $('vacationToggle').addEventListener('click', () => {
   if ($('vacationToggle').getAttribute('aria-expanded') === 'true') renderVacationCalendar();
 });
 
+const EXTRA_TYPE_COLORS = { adm: '#607D8B', aq: '#546E7A', int: '#78909C' };
+
+function findProjectAnywhere(id) {
+  const p = projectsCache.find(x => x.id === id);
+  if (p) return p;
+  for (const type of ['adm', 'aq', 'int']) {
+    const e = (extraCache[type] || []).find(x => x.id === id);
+    if (e) return { ...e, _extraType: type };
+  }
+  return null;
+}
+
 function renderVacationCalendar() {
   const label = $('vacCalLabel');
   if (label) label.textContent = vacCalendarDate.toLocaleString('en', { month: 'long', year: 'numeric' });
@@ -910,11 +921,11 @@ function renderVacationCalendar() {
   const calHolidays = getHolidaysForDates(days.map(d => d.ds));
 
   const TYPE_STYLE = {
-    afspad:      { label: 'Afspad.',  bg: '#FFFDE7', color: '#6D4C41' },
-    ferielov:    { label: 'Vac.',     bg: '#FFF9C4', color: '#5D4037' },
-    feriefridag: { label: 'Feriefriday', bg: '#FFF176', color: '#4E342E' },
-    sick:        { label: 'Sick',     bg: '#FFE082', color: '#3E2723' },
-    day_off:     { label: 'Day off',  bg: '#FFF9C4', color: '#5D4037' }
+    afspad:      { label: 'Afspad.',  bg: '#CFD8DC', color: '#263238' },
+    ferielov:    { label: 'Vac.',     bg: '#B0BEC5', color: '#1C313A' },
+    feriefridag: { label: 'Feriefriday', bg: '#D7CCC8', color: '#3E2723' },
+    sick:        { label: 'Sick',     bg: '#BDBDBD', color: '#212121' },
+    day_off:     { label: 'Day off',  bg: '#E0E0E0', color: '#424242' }
   };
 
   const employees = allUsersCache.filter(u => u.active !== false);
@@ -940,17 +951,38 @@ function renderVacationCalendar() {
     </th>`).join('')}
   </tr>`;
 
+  // Build hours lookup: { userId: { date: { projectId: hours } } }
+  const hoursLookup = {};
+  allEntriesCache.forEach(en => {
+    if (!hoursLookup[en.userId]) hoursLookup[en.userId] = {};
+    if (!hoursLookup[en.userId][en.date]) hoursLookup[en.userId][en.date] = {};
+    hoursLookup[en.userId][en.date][en.projectId] = (hoursLookup[en.userId][en.date][en.projectId] || 0) + en.hours;
+  });
+
+  const getWorkColor = (uid, dateStr) => {
+    const dayEntries = hoursLookup[uid]?.[dateStr];
+    if (!dayEntries || !Object.keys(dayEntries).length) return null;
+    const topId = Object.entries(dayEntries).sort((a, b) => b[1] - a[1])[0][0];
+    const proj = findProjectAnywhere(topId);
+    if (!proj) return null;
+    if (proj._extraType) return { color: EXTRA_TYPE_COLORS[proj._extraType], name: proj.name || proj._extraType.toUpperCase() };
+    const color = getProjectBadgeColor(proj);
+    return color ? { color, name: proj.name } : null;
+  };
+
   const bodyRows = employees.map(u => {
     const userAbs = absByUser[u.uid] || {};
     const cells = days.map(d => {
       const type    = userAbs[d.ds];
       const holiday = calHolidays[d.ds];
       const s       = type ? TYPE_STYLE[type] : null;
+      const work    = !type && !holiday && !d.isWE ? getWorkColor(u.uid, d.ds) : null;
       const isGrey  = d.isWE || !!holiday;
-      const bg      = holiday ? '#EDEEE9' : isGrey ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
-      const style   = s ? `background:${s.bg};color:${s.color}` : bg ? `background:${bg}` : '';
+      const bg      = s ? s.bg : work ? work.color : isGrey ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
+      const clr     = s ? s.color : work ? '#fff' : '';
+      const style   = bg ? `background:${bg};${clr ? `color:${clr}` : ''}` : '';
       const label   = s ? s.label : (holiday ? `<span class="holiday-name-cell" style="font-size:0.6rem">${holiday}</span>` : '');
-      const title   = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : (holiday || '');
+      const title   = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : (holiday || (work ? work.name : ''));
       return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="${style}" title="${title}">${label}</td>`;
     }).join('');
     return `<tr><th class="vac-name">${escapeHtml(u.name)}</th>${cells}</tr>`;
@@ -2782,7 +2814,6 @@ function renderAbsenceSummary() {
       <td class="num">${r.total ? `<strong>${r.total} d</strong>` : '—'}</td>
     </tr>`).join('');
 }
-makeToggle('weekOverviewToggle', 'weekOverviewBody', 'weekOverviewChevron');
 makeToggle('projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron');
 makeToggle('ratesToggle', 'ratesBody', 'ratesChevron');
 makeToggle('rateLineToggle', 'rateLinesSections', 'rateLineChevron');
@@ -2790,6 +2821,7 @@ makeToggle('hoursCardToggle', 'hoursCardBody', 'hoursCardChevron');
 makeToggle('flexToggle', 'flexBody', 'flexChevron');
 makeToggle('vacSummaryToggle', 'vacSummaryBody', 'vacSummaryChevron');
 makeToggle('archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron');
+makeToggle('allEntriesToggle', 'allEntriesBody', 'allEntriesChevron');
 
 $('archivedUsersTable').addEventListener('click', async (e) => {
   const unarchiveUid = e.target.dataset.unarchiveUser;
