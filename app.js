@@ -1783,8 +1783,9 @@ $('projectsTable').querySelector('thead').addEventListener('click', (e) => {
 
 $('projectsTable').addEventListener('click', async (e) => {
   // Collapse/expand parent
-  if (e.target.dataset.toggleParent) {
-    const pid = e.target.dataset.toggleParent;
+  const parentToggleEl = e.target.closest('[data-toggle-parent]');
+  if (parentToggleEl) {
+    const pid = parentToggleEl.dataset.toggleParent;
     if (collapsedParents.has(pid)) collapsedParents.delete(pid);
     else collapsedParents.add(pid);
     renderProjectsTable();
@@ -2019,6 +2020,23 @@ function initExtraTypeCards() {
       await db.collection('projects').doc(currentExtraAccess.id).update({ assignedUserIds: checked });
       document.getElementById(`access-${type}`).classList.add('hidden');
       showStamp('Saved');
+    }
+  });
+
+  // Re-attach all static editor card toggles when editor logs in
+  [
+    ['archivedToggle',      'archivedBody',      'archivedChevron'],
+    ['projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron'],
+    ['allEntriesToggle',    'allEntriesBody',    'allEntriesChevron'],
+    ['ratesToggle',         'ratesBody',         'ratesChevron'],
+    ['archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron'],
+    ['vacationToggle',      'vacationBody',      'vacationChevron'],
+    ['absenceCardToggle',   'absenceCardBody',   'absenceCardChevron'],
+  ].forEach(([t, b, c]) => {
+    const el = document.getElementById(t);
+    if (el && !el.dataset.toggleBound) {
+      el.dataset.toggleBound = '1';
+      makeToggle(t, b, c);
     }
   });
 }
