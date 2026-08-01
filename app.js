@@ -47,7 +47,12 @@ let allAbsencesCache = [];
 let allEntriesCache = [];
 let officeCalendarCache = {}; // year string -> { closingDays:[{date,name}], deletedHolidays:[date,...] }
 
-// ---- Office calendar helpers ----
+// Called directly from the parent toggle span in the projects table
+window.toggleEditorParent = (pid) => {
+  if (collapsedParents.has(pid)) collapsedParents.delete(pid);
+  else collapsedParents.add(pid);
+  renderProjectsTable();
+};
 function getYearCalendar(year) {
   const data = officeCalendarCache[String(year)] || {};
   return {
@@ -1529,7 +1534,7 @@ function renderProjectsTable() {
       const n = (p.assignedUserIds || []).length;
       rows.push(`
       <tr class="project-parent-row${p.status === 'paused' ? ' proj-paused' : ''}">
-        <td class="toggle-col"><span class="parent-toggle link-btn" data-toggle-parent="${p.id}">${collapsed ? '▶' : '▼'}</span></td>
+        <td class="toggle-col"><span class="parent-toggle link-btn" onclick="toggleEditorParent('${p.id}')">${collapsed ? '▶' : '▼'}</span></td>
         <td class="num-col">${projectCodeBadgeHtml(p)}</td>
         <td><strong>${escapeHtml(p.name)}</strong> <span class="optional">(${children.length} sub-project${children.length !== 1 ? 's' : ''})</span></td>
         <td>${escapeHtml(p.client || '')}</td>
@@ -1782,15 +1787,6 @@ $('projectsTable').querySelector('thead').addEventListener('click', (e) => {
 });
 
 $('projectsTable').addEventListener('click', async (e) => {
-  // Collapse/expand parent
-  const parentToggleEl = e.target.closest('[data-toggle-parent]');
-  if (parentToggleEl) {
-    const pid = parentToggleEl.dataset.toggleParent;
-    if (collapsedParents.has(pid)) collapsedParents.delete(pid);
-    else collapsedParents.add(pid);
-    renderProjectsTable();
-    return;
-  }
   const editId = e.target.dataset.editProject;
   const toggleId = e.target.dataset.toggleProject;
   const accessId = e.target.dataset.accessProject;
