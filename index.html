@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
-<link rel="stylesheet" href="fonts.css?v=202608012036" />
-<link rel="stylesheet" href="styles.css?v=202608012036" />
+<link rel="stylesheet" href="fonts.css?v=202608012044" />
+<link rel="stylesheet" href="styles.css?v=202608012044" />
 </head>
 <body>
 
@@ -283,6 +283,7 @@
 
 
 
+
       <div class="card">
         <div class="card-header-row card-toggle" id="allEntriesToggle" role="button" tabindex="0" aria-expanded="false">
           <h2>All entries <span class="chevron collapsed" id="allEntriesChevron">▾</span></h2>
@@ -345,6 +346,22 @@
 
 
       <div class="card">
+        <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="true">
+          <h2>Employee Calendar <span class="chevron" id="vacationChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
+            <button id="vacCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
+            <span id="vacCalLabel" class="week-label"></span>
+            <button id="vacCalNextBtn" class="btn btn-ghost" type="button">›</button>
+            <button id="vacCalTodayBtn" class="btn btn-ghost" type="button">This month</button>
+          </div>
+        </div>
+        <div id="vacationBody" class="collapsible-body">
+          <div id="vacationCalendar"></div>
+        </div>
+      </div>
+
+
+      <div class="card">
         <div class="card-header-row card-toggle" id="ratesToggle" role="button" tabindex="0" aria-expanded="false">
           <h2>Employees <span class="chevron collapsed" id="ratesChevron">▾</span></h2>
         </div>
@@ -373,22 +390,6 @@
             </table>
           </div>
           <p id="archivedUsersEmpty" class="empty-state hidden">No archived users.</p>
-        </div>
-      </div>
-
-
-      <div class="card">
-        <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="false">
-          <h2>Employee Calendar <span class="chevron collapsed" id="vacationChevron">▾</span></h2>
-          <div class="week-nav" onclick="event.stopPropagation()">
-            <button id="vacCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
-            <span id="vacCalLabel" class="week-label"></span>
-            <button id="vacCalNextBtn" class="btn btn-ghost" type="button">›</button>
-            <button id="vacCalTodayBtn" class="btn btn-ghost" type="button">This month</button>
-          </div>
-        </div>
-        <div id="vacationBody" class="collapsible-body hidden">
-          <div id="vacationCalendar"></div>
         </div>
       </div>
 
@@ -436,6 +437,7 @@
       </div>
 
     </section>
+    </section>
 
   </main>
   <footer class="app-footer">
@@ -454,7 +456,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202608012036"></script>
-<script src="app.js?v=202608012036"></script>
+<script src="config.js?v=202608012044"></script>
+<script src="app.js?v=202608012044"></script>
 </body>
 </html>
