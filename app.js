@@ -940,18 +940,22 @@ function renderVacationCalendar() {
     hoursLookup[en.userId][en.date][en.projectId] = (hoursLookup[en.userId][en.date][en.projectId] || 0) + en.hours;
   });
 
-  const getWorkColor = (uid, dateStr) => {
+  const getWorkItems = (uid, dateStr) => {
     const dayEntries = hoursLookup[uid]?.[dateStr];
-    if (!dayEntries || !Object.keys(dayEntries).length) return null;
-    const topId = Object.entries(dayEntries).sort((a, b) => b[1] - a[1])[0][0];
-    const proj = findProjectAnywhere(topId);
-    if (!proj) return null;
-    if (proj._extraType) {
-      const c = EXTRA_TYPE_COLORS[proj._extraType] || { bg: '#B0BEC5', text: '#263238' };
-      return { color: c.bg, textColor: c.text, name: proj.name || proj._extraType.toUpperCase() };
-    }
-    const color = getProjectBadgeColor(proj);
-    return color ? { color, textColor: '#fff', name: proj.name } : null;
+    if (!dayEntries) return [];
+    return Object.entries(dayEntries)
+      .sort((a, b) => b[1] - a[1]) // most hours first
+      .map(([id]) => {
+        const proj = findProjectAnywhere(id);
+        if (!proj) return null;
+        if (proj._extraType) {
+          const c = EXTRA_TYPE_COLORS[proj._extraType] || { bg: '#B0BEC5', text: '#263238' };
+          return { bg: c.bg, text: c.text, name: proj.name || proj._extraType.toUpperCase() };
+        }
+        const color = getProjectBadgeColor(proj);
+        return color ? { bg: color, text: '#fff', name: proj.name } : null;
+      })
+      .filter(Boolean);
   };
 
   const bodyRows = employees.map(u => {
@@ -960,17 +964,33 @@ function renderVacationCalendar() {
       const type    = userAbs[d.ds];
       const holiday = calHolidays[d.ds];
       const s       = type ? TYPE_STYLE[type] : null;
-      const work    = !type && !holiday && !d.isWE ? getWorkColor(u.uid, d.ds) : null;
       const isGrey  = d.isWE || !!holiday;
-      const bg      = s ? s.bg : work ? work.color : isGrey ? 'var(--line-soft)' : d.isToday ? 'var(--accent-soft)' : '';
-      const clr     = s ? s.color : work ? (work.textColor || '#fff') : '';
-      const style   = bg ? `background:${bg};${clr ? `color:${clr}` : ''}` : '';
-      const label   = s ? s.label
-        : holiday ? `<span class="holiday-name-cell" style="font-size:0.6rem">${holiday}</span>`
-        : work ? `<span style="font-size:0.62rem;font-weight:600;overflow:hidden;display:block;line-height:1.1">${work.name.slice(0, 7)}</span>`
-        : '';
-      const title   = type ? (ABSENCE_TYPES.find(x => x.value === type)?.label || type) : (holiday || (work ? work.name : ''));
-      return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="${style}" title="${title}">${label}</td>`;
+
+      if (s) {
+        const style = `background:${s.bg};color:${s.color}`;
+        const title = ABSENCE_TYPES.find(x => x.value === type)?.label || type;
+        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="${style}" title="${title}">${s.label}</td>`;
+      }
+      if (holiday) {
+        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="background:#EDEEE9" title="${holiday}">
+          <span class="holiday-name-cell" style="font-size:0.6rem">${holiday}</span>
+        </td>`;
+      }
+      if (isGrey) {
+        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="background:var(--line-soft)"></td>`;
+      }
+      if (d.isToday) {
+        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="background:var(--accent-soft)"></td>`;
+      }
+
+      const items = getWorkItems(u.uid, d.ds);
+      if (!items.length) {
+        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}"></td>`;
+      }
+      const chips = items.map(item =>
+        `<span style="display:block;background:${item.bg};color:${item.text};font-size:0.6rem;font-weight:600;line-height:1.3;padding:0 2px;margin-bottom:1px;overflow:hidden;white-space:nowrap" title="${escapeHtml(item.name)}">${item.name.slice(0, 7)}</span>`
+      ).join('');
+      return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="padding:1px 2px">${chips}</td>`;
     }).join('');
     return `<tr><th class="vac-name">${escapeHtml(u.name)}</th>${cells}</tr>`;
   }).join('');
