@@ -162,8 +162,7 @@ let userSortDir = 'desc';
 // Generic extra-type system (ADM, AQ, INT — all stored in the projects collection with a type field)
 const EXTRA_TYPES = [
   { type: 'adm', label: 'ADM' },
-  { type: 'aq',  label: 'AQ'  },
-  { type: 'int', label: 'INT' }
+  { type: 'aq',  label: 'AQ'  }
 ];
 
 const ABSENCE_TYPES = [
@@ -828,9 +827,8 @@ $('vacationToggle').addEventListener('click', () => {
 });
 
 const EXTRA_TYPE_COLORS = {
-  adm: { bg: '#E8D5B0', text: '#5D4037' },  // bright sand / beige
-  aq:  { bg: '#FFD740', text: '#5D4037' },  // bright yellow
-  int: { bg: '#6D4C41', text: '#fff'    }   // dark brownish
+  adm: { bg: '#E8D5B0', text: '#5D4037' },
+  aq:  { bg: '#FFD740', text: '#5D4037' }
 };
 
 function findProjectAnywhere(id) {
